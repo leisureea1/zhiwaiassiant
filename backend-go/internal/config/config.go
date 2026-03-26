@@ -102,9 +102,6 @@ func splitCSV(v string) []string {
 			out = append(out, s)
 		}
 	}
-	if len(out) == 0 {
-		return []string{"*"}
-	}
 	return out
 }
 
