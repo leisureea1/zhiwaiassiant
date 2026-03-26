@@ -56,11 +56,11 @@
 						</view>
 						<text class="mini-app-label">成绩查询</text>
 					</view>
-					<view class="mini-app-item">
+					<view class="mini-app-item" @tap="navigateTo('/pages/grade-subscription/index', 'grade-subscription')">
 						<view class="mini-app-icon">
 							<text class="iconfont icon-event_note"></text>
 						</view>
-						<text class="mini-app-label">选课系统</text>
+						<text class="mini-app-label">成绩订阅</text>
 					</view>
 					<view class="mini-app-item">
 						<view class="mini-app-icon">

@@ -71,6 +71,13 @@
 			}
 		},
 		{
+			"path": "pages/grade-subscription/index",
+			"style": {
+				"navigationStyle": "custom",
+				"navigationBarTitleText": "成绩订阅"
+			}
+		},
+		{
 			"path": "pages/ai-chat/index",
 			"style": {
 				"navigationStyle": "custom",

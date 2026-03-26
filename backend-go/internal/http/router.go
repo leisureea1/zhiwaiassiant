@@ -41,6 +41,11 @@ func NewRouter(cfg *config.Config, db *gorm.DB, redisClient *redis.Client) *gin.
 	annHandler := handlers.NewAnnouncementsHandler(db)
 	jwxtHandler := handlers.NewJWXTHandler(db, jwxtSvc)
 	adminHandler := handlers.NewAdminHandler(db)
+	gradeSubHandler := handlers.NewGradeSubscriptionHandler(db)
+
+	// Start grade subscription scheduler
+	gradeSubSvc := service.NewGradeSubscriptionService(db, jwxtSvc, mailSvc)
+	go gradeSubSvc.Start()
 
 	api := r.Group(cfg.APIPrefix)
 	{
@@ -83,6 +88,10 @@ func NewRouter(cfg *config.Config, db *gorm.DB, redisClient *redis.Client) *gin.
 			protected.GET("/announcements/unviewed-count", annHandler.GetUnviewedCount)
 			protected.GET("/announcements/:id", annHandler.Detail)
 			protected.POST("/announcements/:id/mark-viewed", annHandler.MarkViewed)
+
+			// 成绩订阅
+			protected.GET("/grade-subscription", gradeSubHandler.GetSubscription)
+			protected.POST("/grade-subscription", gradeSubHandler.UpdateSubscription)
 
 			jwxt := protected.Group("/jwxt")
 			{

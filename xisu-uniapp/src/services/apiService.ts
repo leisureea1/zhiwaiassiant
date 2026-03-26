@@ -783,3 +783,25 @@ export const announcementApi = {
   /** 标记公告为已读 */
   markViewed: (id: string) => post(`/announcements/${id}/mark-viewed`),
 };
+
+// ============================================
+// 成绩订阅 API
+// ============================================
+
+export interface GradeSubscriptionData {
+  id?: string;
+  enabled: boolean;
+  lastCheckedAt?: string;
+  lastNotifiedAt?: string;
+  totalNotified?: number;
+  semesterId?: string;
+  message?: string;
+}
+
+export const gradeSubscriptionApi = {
+  /** 获取成绩订阅状态 */
+  getStatus: () => get<GradeSubscriptionData>('/grade-subscription'),
+
+  /** 更新成绩订阅（开启/关闭） */
+  update: (enabled: boolean) => post<GradeSubscriptionData>('/grade-subscription', { enabled }),
+};

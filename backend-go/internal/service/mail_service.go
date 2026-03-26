@@ -59,6 +59,41 @@ func (s *MailService) SendVerificationCode(to, code string) error {
 	return s.sendMail(to, subject, body)
 }
 
+func (s *MailService) SendGradeNotification(to, realName, semesterName, gradeTableHTML string, changeCount int) error {
+	subject := "【知外助手】成绩变化通知"
+	body := strings.ReplaceAll(`
+		<div style="max-width: 600px; margin: 0 auto; padding: 20px; font-family: 'Microsoft YaHei', sans-serif;">
+			<div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px 10px 0 0;">
+				<h1 style="color: white; margin: 0; text-align: center;">知外助手</h1>
+			</div>
+			<div style="background: #ffffff; padding: 40px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px;">
+				<h2 style="color: #1f2937; margin-bottom: 20px;">成绩变化通知</h2>
+				<p style="color: #6b7280; font-size: 16px; line-height: 1.6;">
+					尊敬的 <strong>{{REAL_NAME}}</strong>，您好！
+				</p>
+				<p style="color: #6b7280; font-size: 16px; line-height: 1.6;">
+					系统检测到您在 <strong>{{SEMESTER}}</strong> 的成绩发生了变化，共有 <strong style="color: #ef4444;">{{COUNT}}</strong> 条成绩更新。
+				</p>
+				<div style="background: #f9fafb; padding: 20px; border-radius: 8px; margin: 20px 0; overflow-x: auto;">
+					{{GRADE_TABLE}}
+				</div>
+				<p style="color: #6b7280; font-size: 14px; line-height: 1.6; margin-top: 20px;">
+					如果您不想继续接收此类通知，可以在「应用中心 - 成绩订阅」中关闭订阅。
+				</p>
+				<hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;" />
+				<p style="color: #9ca3af; font-size: 12px; text-align: center;">
+					此邮件由知外助手系统自动发送，请勿直接回复
+				</p>
+			</div>
+		</div>
+	`, "{{REAL_NAME}}", realName)
+	body = strings.ReplaceAll(body, "{{SEMESTER}}", semesterName)
+	body = strings.ReplaceAll(body, "{{COUNT}}", fmt.Sprintf("%d", changeCount))
+	body = strings.ReplaceAll(body, "{{GRADE_TABLE}}", gradeTableHTML)
+
+	return s.sendMail(to, subject, body)
+}
+
 func (s *MailService) SendPasswordReset(to, code string) error {
 	subject := "【西外校园】密码重置验证码"
 	body := strings.ReplaceAll(`

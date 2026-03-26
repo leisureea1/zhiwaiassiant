@@ -143,3 +143,20 @@ type UploadedFile struct {
 func (UploadedFile) TableName() string {
 	return "uploaded_files"
 }
+
+type GradeSubscription struct {
+	ID               string     `gorm:"column:id;primaryKey"`
+	UserID           string     `gorm:"column:user_id;uniqueIndex"`
+	Enabled          bool       `gorm:"column:enabled;default:false"`
+	LastCheckedAt    *time.Time `gorm:"column:last_checked_at"`
+	LastGradeHash    *string    `gorm:"column:last_grade_hash"`
+	LastNotifiedAt   *time.Time `gorm:"column:last_notified_at"`
+	TotalNotified    int        `gorm:"column:total_notified;default:0"`
+	SemesterID       *string    `gorm:"column:semester_id"`
+	CreatedAt        time.Time  `gorm:"column:created_at"`
+	UpdatedAt        time.Time  `gorm:"column:updated_at"`
+}
+
+func (GradeSubscription) TableName() string {
+	return "grade_subscriptions"
+}
