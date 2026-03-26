@@ -120,9 +120,8 @@ func (s *MailService) sendMail(to, subject, body string) error {
 
 	conn, err := tls.Dial("tcp", addr, tlsConfig)
 	if err != nil {
-		// 如果 TLS 失败，尝试普通连接
-		log.Printf("TLS connection failed, trying plain SMTP: %v", err)
-		return smtp.SendMail(addr, auth, s.from, []string{to}, msg)
+		log.Printf("TLS connection failed: %v", err)
+		return fmt.Errorf("SMTP TLS connection failed, refusing to send credentials over plaintext")
 	}
 	defer conn.Close()
 
