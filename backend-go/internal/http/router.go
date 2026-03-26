@@ -28,7 +28,7 @@ func NewRouter(cfg *config.Config, db *gorm.DB, redisClient *redis.Client) *gin.
 	mailSvc := service.NewMailService(cfg.MailHost, cfg.MailPort, cfg.MailUsername, cfg.MailPassword, cfg.MailFrom)
 
 	healthHandler := handlers.NewHealthHandler(db, redisClient)
-	authHandler := handlers.NewAuthHandler(db, tokenSvc)
+	authHandler := handlers.NewAuthHandler(db, tokenSvc, redisClient)
 	extAuthHandler := handlers.NewExtendedAuthHandler(db, tokenSvc, mailSvc, jwxtSvc, redisClient)
 	usersHandler := handlers.NewUsersHandler(db)
 	annHandler := handlers.NewAnnouncementsHandler(db)

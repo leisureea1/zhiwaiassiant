@@ -1,13 +1,14 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/go-redis/redis/v8"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 	"xisu/backend-go/internal/database"
@@ -19,63 +20,51 @@ import (
 type AuthHandler struct {
 	db           *gorm.DB
 	tokenService *service.TokenService
-	loginMu      sync.Mutex
-	loginAttempts map[string][]time.Time
+	rdb          *redis.Client
 }
 
-func NewAuthHandler(db *gorm.DB, tokenService *service.TokenService) *AuthHandler {
-	return &AuthHandler{db: db, tokenService: tokenService, loginAttempts: map[string][]time.Time{}}
+func NewAuthHandler(db *gorm.DB, tokenService *service.TokenService, rdb *redis.Client) *AuthHandler {
+	return &AuthHandler{db: db, tokenService: tokenService, rdb: rdb}
 }
 
 const (
-	maxLoginAttempts = 8
-	loginWindow      = 10 * time.Minute
+	loginAttemptPrefix = "login_attempt:"
+	maxLoginAttempts   = 8
+	loginWindow        = 10 * time.Minute
 )
 
-func (h *AuthHandler) loginAttemptKey(ip, identifier string) string {
-	return ip + "|" + strings.ToLower(strings.TrimSpace(identifier))
-}
-
 func (h *AuthHandler) tooManyLoginAttempts(ip, identifier string) bool {
-	now := time.Now()
-	key := h.loginAttemptKey(ip, identifier)
-
-	h.loginMu.Lock()
-	defer h.loginMu.Unlock()
-
-	history := h.loginAttempts[key]
-	kept := make([]time.Time, 0, len(history)+1)
-	for _, t := range history {
-		if now.Sub(t) <= loginWindow {
-			kept = append(kept, t)
-		}
+	if h.rdb == nil {
+		return false
 	}
-	h.loginAttempts[key] = kept
-	return len(kept) >= maxLoginAttempts
+	key := loginAttemptPrefix + ip + "|" + strings.ToLower(strings.TrimSpace(identifier))
+	ctx := context.Background()
+	count, err := h.rdb.Exists(ctx, key).Result()
+	if err != nil || count == 0 {
+		return false
+	}
+	return count >= maxLoginAttempts
 }
 
 func (h *AuthHandler) recordLoginFailure(ip, identifier string) {
-	now := time.Now()
-	key := h.loginAttemptKey(ip, identifier)
-
-	h.loginMu.Lock()
-	defer h.loginMu.Unlock()
-
-	history := h.loginAttempts[key]
-	kept := make([]time.Time, 0, len(history)+1)
-	for _, t := range history {
-		if now.Sub(t) <= loginWindow {
-			kept = append(kept, t)
-		}
+	if h.rdb == nil {
+		return
 	}
-	h.loginAttempts[key] = append(kept, now)
+	key := loginAttemptPrefix + ip + "|" + strings.ToLower(strings.TrimSpace(identifier))
+	ctx := context.Background()
+	pipe := h.rdb.Pipeline()
+	pipe.RPush(ctx, key, time.Now().Unix())
+	pipe.LTrim(ctx, key, -maxLoginAttempts, -1)
+	pipe.Expire(ctx, key, loginWindow)
+	pipe.Exec(ctx)
 }
 
 func (h *AuthHandler) resetLoginAttempts(ip, identifier string) {
-	key := h.loginAttemptKey(ip, identifier)
-	h.loginMu.Lock()
-	delete(h.loginAttempts, key)
-	h.loginMu.Unlock()
+	if h.rdb == nil {
+		return
+	}
+	key := loginAttemptPrefix + ip + "|" + strings.ToLower(strings.TrimSpace(identifier))
+	h.rdb.Del(context.Background(), key)
 }
 
 type LoginRequest struct {
