@@ -192,7 +192,7 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 
 	var row database.RefreshToken
 	digest := refreshTokenDigest(req.RefreshToken)
-	if err := h.db.Where("token = ? OR token = ?", digest, req.RefreshToken).First(&row).Error; err != nil {
+	if err := h.db.Where("token = ?", digest).First(&row).Error; err != nil {
 		response.Error(c, http.StatusUnauthorized, "refresh token not found")
 		return
 	}
