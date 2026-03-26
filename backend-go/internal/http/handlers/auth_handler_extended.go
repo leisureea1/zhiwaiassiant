@@ -34,7 +34,28 @@ const (
 	VerifyAttemptPrefix    = "verify_attempt:"
 	ResetAttemptPrefix     = "reset_attempt:"
 	MaxCodeAttempts        = 5
+	minPasswordLength      = 8
 )
+
+var passwordLowercaseRegex = regexp.MustCompile(`^.*[a-z].*$`)
+var passwordUppercaseRegex = regexp.MustCompile(`^.*[A-Z].*$`)
+var passwordDigitRegex = regexp.MustCompile(`^.*\d.*$`)
+
+func validatePasswordComplexity(password string) string {
+	if len(password) < minPasswordLength {
+		return fmt.Sprintf("密码长度至少为%d位", minPasswordLength)
+	}
+	if !passwordLowercaseRegex.MatchString(password) {
+		return "密码必须包含至少一个小写字母"
+	}
+	if !passwordUppercaseRegex.MatchString(password) {
+		return "密码必须包含至少一个大写字母"
+	}
+	if !passwordDigitRegex.MatchString(password) {
+		return "密码必须包含至少一个数字"
+	}
+	return ""
+}
 
 type resetTokenClaims struct {
 	Email string `json:"email"`
@@ -333,7 +354,7 @@ func (h *ExtendedAuthHandler) VerifyEmailCode(c *gin.Context) {
 
 type RegisterRequest struct {
 	Username      string  `json:"username" binding:"required,min=3"`
-	Password      string  `json:"password" binding:"required,min=6"`
+	Password      string  `json:"password" binding:"required,min=8"`
 	Email         string  `json:"email" binding:"required,email"`
 	StudentID     string  `json:"studentId" binding:"required"`
 	XiwaiPassword string  `json:"xiwaiPassword" binding:"required"`
@@ -351,6 +372,12 @@ func (h *ExtendedAuthHandler) Register(c *gin.Context) {
 	// 验证用户名格式
 	if !regexp.MustCompile(`^[a-zA-Z0-9_]+$`).MatchString(req.Username) {
 		response.Error(c, http.StatusBadRequest, "用户名只能包含字母、数字和下划线")
+		return
+	}
+
+	// 验证密码复杂度
+	if msg := validatePasswordComplexity(req.Password); msg != "" {
+		response.Error(c, http.StatusBadRequest, msg)
 		return
 	}
 
@@ -483,7 +510,7 @@ func (h *ExtendedAuthHandler) Register(c *gin.Context) {
 
 type ChangePasswordRequest struct {
 	OldPassword string `json:"oldPassword" binding:"required"`
-	NewPassword string `json:"newPassword" binding:"required,min=6"`
+	NewPassword string `json:"newPassword" binding:"required,min=8"`
 }
 
 func (h *ExtendedAuthHandler) ChangePassword(c *gin.Context) {
@@ -491,6 +518,11 @@ func (h *ExtendedAuthHandler) ChangePassword(c *gin.Context) {
 	var req ChangePasswordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, http.StatusBadRequest, "invalid request")
+		return
+	}
+
+	if msg := validatePasswordComplexity(req.NewPassword); msg != "" {
+		response.Error(c, http.StatusBadRequest, msg)
 		return
 	}
 
@@ -590,13 +622,18 @@ func (h *ExtendedAuthHandler) ForgotPassword(c *gin.Context) {
 type ResetPasswordRequest struct {
 	Token       string `json:"token" binding:"required"`
 	Code        string `json:"code" binding:"required,len=6"`
-	NewPassword string `json:"newPassword" binding:"required,min=6"`
+	NewPassword string `json:"newPassword" binding:"required,min=8"`
 }
 
 func (h *ExtendedAuthHandler) ResetPassword(c *gin.Context) {
 	var req ResetPasswordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, http.StatusBadRequest, "invalid request")
+		return
+	}
+
+	if msg := validatePasswordComplexity(req.NewPassword); msg != "" {
+		response.Error(c, http.StatusBadRequest, msg)
 		return
 	}
 
