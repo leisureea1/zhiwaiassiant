@@ -35,7 +35,6 @@ func NewRouter(cfg *config.Config, db *gorm.DB, redisClient *redis.Client) *gin.
 	jwxtHandler := handlers.NewJWXTHandler(db, jwxtSvc)
 	adminHandler := handlers.NewAdminHandler(db)
 	uploadHandler := handlers.NewUploadHandler(db, "./uploads")
-	r.GET("/uploads/attachments/:filename", uploadHandler.ServeAttachment)
 
 	api := r.Group(cfg.APIPrefix)
 	{
@@ -73,6 +72,8 @@ func NewRouter(cfg *config.Config, db *gorm.DB, redisClient *redis.Client) *gin.
 			protected.POST("/users/:id/avatar/upload", uploadHandler.UploadAvatar)
 
 			protected.POST("/upload", uploadHandler.UploadFile)
+
+			protected.GET("/attachments/:filename", uploadHandler.ServeAttachment)
 
 			protected.GET("/announcements", annHandler.List)
 			protected.GET("/announcements/unviewed-count", annHandler.GetUnviewedCount)
