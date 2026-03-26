@@ -23,9 +23,7 @@ var editableConfigKeys = []string{
 	"MAIL_HOST",
 	"MAIL_PORT",
 	"MAIL_USERNAME",
-	"MAIL_PASSWORD",
 	"MAIL_FROM",
-	"JWXT_SERVICE_API_KEY",
 	"UPLOAD_DIR",
 	"MAX_FILE_SIZE",
 }
