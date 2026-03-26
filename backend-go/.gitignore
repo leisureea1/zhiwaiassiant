@@ -1,0 +1,21 @@
+# Binary
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+backend-go
+
+# Test
+*.test
+*.out
+coverage.html
+
+# Vendor (optional, uncomment if not committing vendor)
+# vendor/
+
+# Uploads (user-generated content)
+uploads/attachments/*
+uploads/avatars/*
+!uploads/attachments/.gitkeep
+!uploads/avatars/.gitkeep

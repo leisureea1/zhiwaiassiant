@@ -170,7 +170,7 @@ func (s *JwxtDirectService) exportSession(client *http.Client, username string) 
 	}
 }
 
-func (s *JwxtDirectService) buildCachedSession(client *http.Client, username, password string) *CachedJWXTSession {
+func (s *JwxtDirectService) buildCachedSession(client *http.Client, username, _ string) *CachedJWXTSession {
 	sess := s.exportSession(client, username)
 	sess.StudentID = strings.TrimSpace(s.getStudentID(client))
 	return sess
