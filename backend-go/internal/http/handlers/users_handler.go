@@ -174,12 +174,12 @@ func (h *UsersHandler) List(c *gin.Context) {
 }
 
 type UpdateUserRequest struct {
-	RealName  *string `json:"realName"`
-	Nickname  *string `json:"nickname"`
-	Avatar    *string `json:"avatar"`
-	College   *string `json:"college"`
-	Major     *string `json:"major"`
-	ClassName *string `json:"className"`
+	RealName  *string `json:"realName" binding:"omitempty,max=50"`
+	Nickname  *string `json:"nickname" binding:"omitempty,max=50"`
+	Avatar    *string `json:"avatar" binding:"omitempty,url,max=500"`
+	College   *string `json:"college" binding:"omitempty,max=100"`
+	Major     *string `json:"major" binding:"omitempty,max=100"`
+	ClassName *string `json:"className" binding:"omitempty,max=50"`
 }
 
 func (h *UsersHandler) Update(c *gin.Context) {
