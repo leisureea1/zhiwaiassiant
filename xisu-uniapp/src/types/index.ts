@@ -31,8 +31,8 @@ export const PagePath = {
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
-  content: string;
-  timestamp: number;
+  text: string;
+  timestamp: Date;
 }
 
 // 课程类型

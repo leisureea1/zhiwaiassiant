@@ -201,6 +201,7 @@ import { ref, onMounted } from 'vue';
 import { getUserInfo } from '@/services/apiService';
 import { recordAppUsage as recordUsage, getAppUsage } from '@/utils/appUsage';
 import TabBar from '@/components/TabBar/index.vue';
+import { debugError } from '@/utils/debug';
 
 interface UserDisplay {
 	avatar: string;
@@ -257,7 +258,7 @@ const loadRecentApps = () => {
 			recentApps.value = [...recentApps.value, ...remaining];
 		}
 	} catch (error) {
-		console.error('[Apps] Failed to load recent apps:', error);
+		debugError('[Apps] Failed to load recent apps:', error);
 		recentApps.value = allApps.slice(0, 4);
 	}
 };

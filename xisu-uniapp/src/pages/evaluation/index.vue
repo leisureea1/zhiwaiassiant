@@ -115,6 +115,7 @@ import { ref, onMounted } from 'vue';
 import { safeNavigateBack } from '@/utils/navigation';
 import { jwxtApi, type EvaluationItem } from '@/services/apiService';
 import { recordAppUsage } from '@/utils/appUsage';
+import { debugLog, debugError } from '@/utils/debug';
 
 const isLoading = ref(false);
 const isSubmitting = ref(false);
@@ -138,7 +139,7 @@ const loadEvaluations = async () => {
 	isLoading.value = true;
 	try {
 		const res = await jwxtApi.getEvaluationPending();
-		console.log('[Evaluation] Pending:', JSON.stringify(res));
+		debugLog('[Evaluation] Pending:', JSON.stringify(res));
 		
 		if (res.data?.success && res.data.evaluations) {
 			evaluations.value = res.data.evaluations;
@@ -150,7 +151,7 @@ const loadEvaluations = async () => {
 			emptyMessage.value = res.error || '获取待评教列表失败';
 		}
 	} catch (error) {
-		console.error('[Evaluation] Failed to load:', error);
+		debugError('[Evaluation] Failed to load:', error);
 		evaluations.value = [];
 		emptyMessage.value = '获取失败，请稍后重试';
 	} finally {
@@ -178,7 +179,7 @@ const doAutoEvaluate = async () => {
 	
 	try {
 		const res = await jwxtApi.autoEvaluate();
-		console.log('[Evaluation] Auto result:', JSON.stringify(res));
+		debugLog('[Evaluation] Auto result:', JSON.stringify(res));
 		
 		uni.hideLoading();
 		
@@ -197,7 +198,7 @@ const doAutoEvaluate = async () => {
 		}
 	} catch (error) {
 		uni.hideLoading();
-		console.error('[Evaluation] Auto failed:', error);
+		debugError('[Evaluation] Auto failed:', error);
 		uni.showToast({
 			title: '评教失败，请稍后重试',
 			icon: 'none'

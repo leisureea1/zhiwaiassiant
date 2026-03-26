@@ -275,7 +275,7 @@ const loadSemesters = async () => {
 			}
 		}
 	} catch (error) {
-		console.error('[Exams] Failed to load semesters:', error);
+		debugError('[Exams] Failed to load semesters:', error);
 	}
 };
 
@@ -289,7 +289,7 @@ const loadExams = async () => {
 	isLoading.value = true;
 	try {
 		const res = await jwxtApi.getExams(currentSemesterId.value);
-		console.log('[Exams] Response:', JSON.stringify(res));
+		debugLog('[Exams] Response:', JSON.stringify(res));
 		
 		if (res.data?.success && res.data.exams) {
 			exams.value = res.data.exams;
@@ -301,7 +301,7 @@ const loadExams = async () => {
 			emptyMessage.value = res.error || '获取考试安排失败';
 		}
 	} catch (error) {
-		console.error('[Exams] Failed to load:', error);
+		debugError('[Exams] Failed to load:', error);
 		exams.value = [];
 		emptyMessage.value = '获取考试安排失败，请稍后重试';
 	} finally {

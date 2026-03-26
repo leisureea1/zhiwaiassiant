@@ -126,6 +126,7 @@ import { ref, onMounted, computed } from 'vue';
 import { safeNavigateBack } from '@/utils/navigation';
 import { jwxtApi, type GradeItem, type GradeStatistics, type SemesterInfo } from '@/services/apiService';
 import { recordAppUsage } from '@/utils/appUsage';
+import { debugLog, debugError } from '@/utils/debug';
 
 const isLoading = ref(false);
 const currentSemesterId = ref('');
@@ -258,7 +259,7 @@ const loadSemesters = async () => {
 			}
 		}
 	} catch (error) {
-		console.error('[Grades] Failed to load semesters:', error);
+		debugError('[Grades] Failed to load semesters:', error);
 	}
 };
 
@@ -272,7 +273,7 @@ const loadGrades = async () => {
 	isLoading.value = true;
 	try {
 		const res = await jwxtApi.getGrades(currentSemesterId.value);
-		console.log('[Grades] Response:', JSON.stringify(res));
+		debugLog('[Grades] Response:', JSON.stringify(res));
 		
 		if (res.data?.success) {
 			grades.value = res.data.grades || [];
@@ -287,7 +288,7 @@ const loadGrades = async () => {
 			emptyMessage.value = res.error || res.data?.message || '获取成绩失败';
 		}
 	} catch (error: unknown) {
-		console.error('[Grades] Error:', error);
+		debugError('[Grades] Error:', error);
 		grades.value = [];
 		emptyMessage.value = error instanceof Error ? error.message : '网络错误，请稍后重试';
 	} finally {

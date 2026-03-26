@@ -284,9 +284,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onUnmounted } from 'vue';
 import { safeNavigateBack } from '@/utils/navigation';
 import { authApi, userApi, saveTokens, saveUserInfo } from '@/services/apiService';
+import { debugLog, debugWarn } from '@/utils/debug';
+import { calcPasswordStrength, strengthLabels, strengthClasses, strengthColors, validatePasswordFormat, validatePasswordMatch } from '@/utils/password';
 
 // 当前步骤
 const currentStep = ref(1);
@@ -312,55 +314,14 @@ const passwordError = ref('');
 const confirmPasswordError = ref('');
 
 // 密码强度计算
-const passwordStrength = computed(() => {
-	const value = password.value;
-	if (!value || value.length < 8) return 0;
-	
-	let strength = 0;
-	// 长度贡献
-	if (value.length >= 8) strength++;
-	if (value.length >= 12) strength++;
-	// 包含小写字母
-	if (/[a-z]/.test(value)) strength++;
-	// 包含大写字母
-	if (/[A-Z]/.test(value)) strength++;
-	// 包含数字
-	if (/[0-9]/.test(value)) strength++;
-	// 包含特殊字符
-	if (/[!@#$%^&*(),.?":{}|<>]/.test(value)) strength++;
-	
-	// 返回 1-4 的强度等级
-	if (strength <= 2) return 1;
-	if (strength <= 3) return 2;
-	if (strength <= 4) return 3;
-	return 4;
-});
+const passwordStrength = computed(() => calcPasswordStrength(password.value));
 
-const strengthText = computed(() => {
-	const level = passwordStrength.value;
-	if (level === 0) return '';
-	if (level === 1) return '弱';
-	if (level === 2) return '中';
-	if (level === 3) return '强';
-	return '很强';
-});
+const strengthText = computed(() => strengthLabels[passwordStrength.value]);
 
-const strengthClass = computed(() => {
-	const level = passwordStrength.value;
-	if (level === 1) return 'weak';
-	if (level === 2) return 'medium';
-	if (level === 3) return 'strong';
-	if (level === 4) return 'very-strong';
-	return '';
-});
+const strengthClass = computed(() => strengthClasses[passwordStrength.value]);
 
-const strengthColor = computed(() => {
-	const level = passwordStrength.value;
-	if (level === 1) return '#ef4444';
-	if (level === 2) return '#f59e0b';
-	if (level === 3) return '#10b981';
-	if (level === 4) return '#059669';
-	return '#e5e7eb';
+
+const strengthColor = computed(() => strengthColors[passwordStrength.value]);
 });
 
 // 步骤2: 邮箱
@@ -374,6 +335,13 @@ const emailVerified = ref(false);
 const emailToken = ref('');
 const verifying = ref(false);
 let countdownTimer: ReturnType<typeof setInterval> | null = null;
+
+onUnmounted(() => {
+	if (countdownTimer) {
+		clearInterval(countdownTimer);
+		countdownTimer = null;
+	}
+});
 
 // 发送验证码
 const sendVerificationCode = async () => {
@@ -419,8 +387,8 @@ const verifyCode = async () => {
 			code: verificationCode.value,
 		});
 		
-		console.log('[verifyCode] Response received:', JSON.stringify(res));
-		console.log('[verifyCode] res.verified =', res.verified, 'type:', typeof res.verified);
+		debugLog('[verifyCode] Response received:', JSON.stringify(res));
+		debugLog('[verifyCode] res.verified =', res.verified, 'type:', typeof res.verified);
 		
 		if (res.verified) {
 			emailVerified.value = true;
@@ -475,14 +443,10 @@ const validatePassword = () => {
 		passwordError.value = '';
 		return;
 	}
-	if (value.length < 8) {
-		passwordError.value = '密码至少8位';
-	} else if (value.length > 20) {
+	if (value.length > 20) {
 		passwordError.value = '密码最多20位';
-	} else if (!/[a-z]/.test(value) || !/[A-Z]/.test(value) || !/\d/.test(value)) {
-		passwordError.value = '密码需包含大小写字母和数字';
 	} else {
-		passwordError.value = '';
+		passwordError.value = validatePasswordFormat(value);
 	}
 	if (confirmPassword.value) {
 		validateConfirmPassword();
@@ -495,10 +459,8 @@ const validateConfirmPassword = () => {
 		confirmPasswordError.value = '';
 		return;
 	}
-	if (confirmPassword.value !== password.value) {
-		confirmPasswordError.value = '两次密码不一致';
-	} else {
-		confirmPasswordError.value = '';
+	confirmPasswordError.value = validatePasswordMatch(password.value, confirmPassword.value);
+};
 	}
 };
 
@@ -633,7 +595,7 @@ const handleRegister = async () => {
 					res.user.avatar = uploaded.avatar;
 				}
 			} catch (uploadError) {
-				console.warn('[Register] avatar upload failed:', uploadError);
+				debugWarn('[Register] avatar upload failed:', uploadError);
 				uni.showToast({ title: '头像上传失败，已使用默认头像', icon: 'none' });
 			}
 		}

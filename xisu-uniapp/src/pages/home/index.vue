@@ -154,6 +154,7 @@ import { ref, computed, onMounted } from 'vue';
 import TabBar from '@/components/TabBar/index.vue';
 import { jwxtApi, announcementApi, getAccessToken } from '@/services/apiService';
 import { recordAppUsage } from '@/utils/appUsage';
+import { debugLog, debugError } from '@/utils/debug';
 import type { AnnouncementItem } from '@/services/apiService';
 
 // 学期周数配置
@@ -180,9 +181,9 @@ const saveCoursesCache = (semesterId: string, courses: DisplayCourse[]) => {
 			semesterId,
 		};
 		uni.setStorageSync(`${COURSES_CACHE_KEY}_${semesterId}`, JSON.stringify(cacheData));
-		console.log('[Cache] Courses saved for semester:', semesterId, 'count:', courses.length);
+		debugLog('[Cache] Courses saved for semester:', semesterId, 'count:', courses.length);
 	} catch (e) {
-		console.error('[Cache] Failed to save courses:', e);
+		debugError('[Cache] Failed to save courses:', e);
 	}
 };
 
@@ -194,14 +195,14 @@ const getCoursesCache = (semesterId: string): DisplayCourse[] | null => {
 			const cacheData: CacheData<DisplayCourse[]> = JSON.parse(cached);
 			// 检查缓存是否过期
 			if (Date.now() - cacheData.timestamp < CACHE_DURATION) {
-				console.log('[Cache] Courses loaded from cache for semester:', semesterId);
+				debugLog('[Cache] Courses loaded from cache for semester:', semesterId);
 				return cacheData.data;
 			} else {
-				console.log('[Cache] Courses cache expired for semester:', semesterId);
+				debugLog('[Cache] Courses cache expired for semester:', semesterId);
 			}
 		}
 	} catch (e) {
-		console.error('[Cache] Failed to read courses cache:', e);
+		debugError('[Cache] Failed to read courses cache:', e);
 	}
 	return null;
 };
@@ -217,9 +218,9 @@ const saveSemestersCache = (semesterList: SemesterInfo[], currentId: string) => 
 		if (currentId) {
 			uni.setStorageSync(LAST_SEMESTER_ID_KEY, currentId);
 		}
-		console.log('[Cache] Semesters saved, count:', semesterList.length);
+		debugLog('[Cache] Semesters saved, count:', semesterList.length);
 	} catch (e) {
-		console.error('[Cache] Failed to save semesters:', e);
+		debugError('[Cache] Failed to save semesters:', e);
 	}
 };
 
@@ -231,12 +232,12 @@ const getSemestersCache = (): { list: SemesterInfo[]; currentId: string } | null
 			const cacheData: CacheData<{ list: SemesterInfo[]; currentId: string }> = JSON.parse(cached);
 			// 学期数据缓存有效期更长（7天）
 			if (Date.now() - cacheData.timestamp < 7 * 24 * 60 * 60 * 1000) {
-				console.log('[Cache] Semesters loaded from cache');
+				debugLog('[Cache] Semesters loaded from cache');
 				return cacheData.data;
 			}
 		}
 	} catch (e) {
-		console.error('[Cache] Failed to read semesters cache:', e);
+		debugError('[Cache] Failed to read semesters cache:', e);
 	}
 	return null;
 };
@@ -255,9 +256,9 @@ const clearCoursesCache = (semesterId?: string) => {
 				}
 			});
 		}
-		console.log('[Cache] Courses cache cleared');
+		debugLog('[Cache] Courses cache cleared');
 	} catch (e) {
-		console.error('[Cache] Failed to clear cache:', e);
+		debugError('[Cache] Failed to clear cache:', e);
 	}
 };
 
@@ -413,7 +414,7 @@ const onMultiPickerChange = async (e: any) => {
 	const semesterIdx = values[0];
 	const weekIdx = values[1];
 	
-	console.log('[Home] MultiPicker change:', semesterIdx, weekIdx);
+	debugLog('[Home] MultiPicker change:', semesterIdx, weekIdx);
 	
 	// 检查是否有变化
 	const semester = semesters.value[semesterIdx];
@@ -449,7 +450,7 @@ const onMultiPickerChange = async (e: any) => {
 
 // 列变化时的回调（可用于联动）
 const onColumnChange = (e: any) => {
-	console.log('[Home] Column change:', e.detail.column, e.detail.value);
+	debugLog('[Home] Column change:', e.detail.column, e.detail.value);
 };
 
 // 加载学期列表（优先使用缓存）
@@ -459,7 +460,7 @@ const loadSemesters = async () => {
 	if (cached && cached.list.length > 0) {
 		semesters.value = cached.list;
 		currentSemesterId.value = cached.currentId;
-		console.log('[Home] Loaded semesters from cache:', semesters.value.length);
+		debugLog('[Home] Loaded semesters from cache:', semesters.value.length);
 		// 后台静默更新
 		fetchSemestersFromServer();
 		return;
@@ -472,7 +473,7 @@ const loadSemesters = async () => {
 const fetchSemestersFromServer = async () => {
 	try {
 		const res = await jwxtApi.getSemesters();
-		console.log('[Home] Semesters response:', res);
+		debugLog('[Home] Semesters response:', res);
 
 		// 兼容多种历史/迁移期返回格式
 		const root = (res as any) || {};
@@ -498,10 +499,10 @@ const fetchSemestersFromServer = async () => {
 
 			// 保存到缓存
 			saveSemestersCache(semesters.value, currentSemesterId.value);
-			console.log('[Home] Loaded semesters:', semesters.value.length, 'current:', currentSemesterId.value);
+			debugLog('[Home] Loaded semesters:', semesters.value.length, 'current:', currentSemesterId.value);
 		}
 	} catch (error) {
-		console.error('[Home] Failed to load semesters:', error);
+		debugError('[Home] Failed to load semesters:', error);
 	}
 };
 
@@ -671,21 +672,21 @@ const transformCourses = (apiCourses: Array<{
 const fetchCoursesFromServer = async (semesterId: string, showError = true): Promise<boolean> => {
 	try {
 		const res = await jwxtApi.getCourses(semesterId === 'default' ? undefined : semesterId);
-		console.log('[Home] Courses response:', JSON.stringify(res));
+		debugLog('[Home] Courses response:', JSON.stringify(res));
 		
 		if (res.success && res.data?.courses) {
 			allCourses.value = transformCourses(res.data.courses);
 			// 保存到缓存
 			saveCoursesCache(semesterId, allCourses.value);
-			console.log('[Home] Loaded courses from server:', allCourses.value.length);
+			debugLog('[Home] Loaded courses from server:', allCourses.value.length);
 			return true;
 		} else if (res.error && showError) {
-			console.error('[Home] Failed to load courses:', res.error);
+			debugError('[Home] Failed to load courses:', res.error);
 			uni.showToast({ title: res.error, icon: 'none' });
 		}
 		return false;
 	} catch (error) {
-		console.error('[Home] Error loading courses:', error);
+		debugError('[Home] Error loading courses:', error);
 		const errorMsg = error instanceof Error ? error.message : '加载课程表失败';
 		
 		if (showError) {
@@ -715,7 +716,7 @@ const loadCourses = async (forceRefresh = false) => {
 	// 检查是否已登录
 	const token = getAccessToken();
 	if (!token) {
-		console.log('[Home] Not logged in, skip loading courses');
+		debugLog('[Home] Not logged in, skip loading courses');
 		return;
 	}
 	
@@ -735,7 +736,7 @@ const loadCourses = async (forceRefresh = false) => {
 		allCourses.value.forEach(course => {
 			course.colorClass = getCourseColor(course.name);
 		});
-		console.log('[Home] Displayed from cache:', allCourses.value.length, 'courses');
+		debugLog('[Home] Displayed from cache:', allCourses.value.length, 'courses');
 	}
 	
 	// 2. 同时异步从后端获取最新数据
@@ -793,7 +794,7 @@ const handleRefresh = async () => {
 		
 		// 使用刷新接口（会清除后端缓存重新获取）
 		const res = await jwxtApi.refreshCourses(semesterId === 'default' ? undefined : semesterId);
-		console.log('[Home] Refresh courses response:', JSON.stringify(res));
+		debugLog('[Home] Refresh courses response:', JSON.stringify(res));
 		
 		if (res.success && res.data?.courses) {
 			allCourses.value = transformCourses(res.data.courses);
@@ -935,7 +936,7 @@ const loadPopupAnnouncements = async () => {
 			showAnnouncementPopup.value = true;
 		}
 	} catch (err) {
-		console.log('[Home] Failed to load popup announcements:', err);
+		debugError('[Home] Failed to load popup announcements:', err);
 		tickerAnnouncements.value = [];
 	}
 };
@@ -1013,7 +1014,7 @@ onMounted(async () => {
 			currentSemesterId.value = lastSemesterId;
 		}
 	} catch (e) {
-		console.log('[Home] Failed to read last semester id:', e);
+		debugError('[Home] Failed to read last semester id:', e);
 	}
 
 	const startupSemesterId = currentSemesterId.value;

@@ -139,6 +139,7 @@ import { ref, onMounted, onUnmounted } from 'vue';
 import { getUserInfo, clearTokens, userApi, saveUserInfo, authApi, getRefreshToken } from '@/services/apiService';
 import { PagePath } from '@/types';
 import TabBar from '@/components/TabBar/index.vue';
+import { debugLog, debugWarn, debugError } from '@/utils/debug';
 
 declare const wx: any;
 
@@ -206,7 +207,7 @@ const loadUserInfo = async () => {
 	// 尝试从后端刷新用户信息
 	try {
 		const freshUser = await userApi.getMe();
-		console.log('[Profile] Fresh user data:', JSON.stringify(freshUser));
+		debugLog('[Profile] Fresh user data:', JSON.stringify(freshUser));
 		if (freshUser) {
 			backendUserId.value = freshUser.id || '';
 			const mappedStudentId =
@@ -222,13 +223,13 @@ const loadUserInfo = async () => {
 				college: freshUser.college,
 				className: freshUser.className,
 			};
-			console.log('[Profile] User value after update:', JSON.stringify(user.value));
+			debugLog('[Profile] User value after update:', JSON.stringify(user.value));
 			
 			// 同时更新本地存储
 			saveUserInfo(freshUser);
 		}
 	} catch (error) {
-		console.log('[Profile] Failed to refresh user info:', error);
+		debugError('[Profile] Failed to refresh user info:', error);
 	} finally {
 		isLoading.value = false;
 	}
@@ -332,7 +333,7 @@ const handleAvatarUpload = async () => {
 			await uploadAvatarByFilePath(filePath || '');
 		},
 		fail: (err) => {
-			console.warn('[Profile] chooseImage failed:', err);
+			debugWarn('[Profile] chooseImage failed:', err);
 			uni.showToast({ title: '未能打开相册或相机', icon: 'none' });
 		},
 	});
@@ -342,7 +343,7 @@ onMounted(() => {
 	// #ifdef MP-WEIXIN
 	if (typeof wx !== 'undefined' && typeof wx.onNeedPrivacyAuthorization === 'function') {
 		wx.onNeedPrivacyAuthorization((resolve: PrivacyResolve, eventInfo: { referrer?: string }) => {
-			console.log('[Profile] Need privacy authorization from:', eventInfo?.referrer || 'unknown');
+			debugLog('[Profile] Need privacy authorization from:', eventInfo?.referrer || 'unknown');
 			pendingPrivacyResolve.value = resolve;
 			showPrivacyDialog.value = true;
 			resolve({ event: 'exposureAuthorization' });

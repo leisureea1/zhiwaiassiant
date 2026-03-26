@@ -90,6 +90,7 @@
 import { ref } from 'vue';
 import { safeNavigateBack } from '@/utils/navigation';
 import { authApi, clearTokens } from '@/services/apiService';
+import { validatePasswordFormat, validatePasswordMatch } from '@/utils/password';
 
 const oldPassword = ref('');
 const newPassword = ref('');
@@ -112,11 +113,13 @@ const handleSubmit = async () => {
 		uni.showToast({ title: '请输入新密码', icon: 'none' });
 		return;
 	}
-	if (newPassword.value.length < 8 || !/[a-z]/.test(newPassword.value) || !/[A-Z]/.test(newPassword.value) || !/\d/.test(newPassword.value)) {
-		uni.showToast({ title: '密码至少8位，需包含大小写字母和数字', icon: 'none' });
+	const pwdErr = validatePasswordFormat(newPassword.value);
+	if (pwdErr) {
+		uni.showToast({ title: pwdErr, icon: 'none' });
 		return;
 	}
-	if (newPassword.value !== confirmPassword.value) {
+	const matchErr = validatePasswordMatch(newPassword.value, confirmPassword.value);
+	if (matchErr) {
 		uni.showToast({ title: '两次输入的密码不一致', icon: 'none' });
 		return;
 	}

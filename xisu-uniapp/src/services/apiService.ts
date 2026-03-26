@@ -2,7 +2,7 @@
  * API 服务 - 封装网络请求
  */
 
-// 后端API地址 - NestJS 后端
+// 后端API地址 - Go 后端
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://api.xisu.leisureea.cn/api/v1';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

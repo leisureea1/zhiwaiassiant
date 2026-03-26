@@ -86,9 +86,9 @@
 					<button 
 						class="btn-primary" 
 						@tap="goToStep3"
-						:disabled="verificationCode.length !== 6"
+						:disabled="verificationCode.length !== 6 || isVerifying"
 					>
-						下一步
+						{{ isVerifying ? '验证中...' : '下一步' }}
 					</button>
 				</view>
 			</view>
@@ -176,8 +176,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onUnmounted } from 'vue';
 import { authApi } from '@/services/apiService';
+import { calcPasswordStrength, strengthLabels, strengthColors, validatePasswordFormat, validatePasswordMatch } from '@/utils/password';
 
 // 步骤控制
 const currentStep = ref(1);
@@ -202,8 +203,17 @@ const confirmPasswordError = ref('');
 // 状态控制
 const sending = ref(false);
 const submitting = ref(false);
+const isVerifying = ref(false);
+const emailToken = ref('');
 const countdown = ref(0);
 let countdownTimer: ReturnType<typeof setInterval> | null = null;
+
+onUnmounted(() => {
+	if (countdownTimer) {
+		clearInterval(countdownTimer);
+		countdownTimer = null;
+	}
+});
 
 // 邮箱验证
 const validateEmail = () => {
@@ -220,14 +230,16 @@ const validateEmail = () => {
 	return true;
 };
 
+
 // 密码验证
 const validatePassword = () => {
 	if (!newPassword.value) {
 		passwordError.value = '';
 		return false;
 	}
-	if (newPassword.value.length < 8) {
-		passwordError.value = '密码至少8个字符';
+	const err = validatePasswordFormat(newPassword.value);
+	if (err) {
+		passwordError.value = err;
 		return false;
 	}
 	passwordError.value = '';
@@ -241,35 +253,17 @@ const validateConfirmPassword = () => {
 		confirmPasswordError.value = '';
 		return false;
 	}
-	if (confirmPassword.value !== newPassword.value) {
-		confirmPasswordError.value = '两次输入的密码不一致';
-		return false;
-	}
-	confirmPasswordError.value = '';
-	return true;
+	confirmPasswordError.value = validatePasswordMatch(newPassword.value, confirmPassword.value);
+	return !confirmPasswordError.value;
 };
 
+
 // 密码强度
-const passwordStrength = computed(() => {
-	const pwd = newPassword.value;
-	if (!pwd) return 0;
-	let strength = 0;
-	if (pwd.length >= 8) strength++;
-	if (pwd.length >= 10) strength++;
-	if (/[A-Z]/.test(pwd) && /[a-z]/.test(pwd)) strength++;
-	if (/[0-9]/.test(pwd) && /[^A-Za-z0-9]/.test(pwd)) strength++;
-	return strength;
-});
+const passwordStrength = computed(() => calcPasswordStrength(newPassword.value));
 
-const strengthText = computed(() => {
-	const texts = ['', '弱', '中', '强', '很强'];
-	return texts[passwordStrength.value];
-});
+const strengthText = computed(() => strengthLabels[passwordStrength.value]);
 
-const strengthColor = computed(() => {
-	const colors = ['', '#ef4444', '#f59e0b', '#10b981', '#3b82f6'];
-	return colors[passwordStrength.value];
-});
+const strengthColor = computed(() => strengthColors[passwordStrength.value]);
 
 const strengthClass = computed(() => {
 	const classes = ['', 'weak', 'medium', 'strong', 'very-strong'];
@@ -333,14 +327,38 @@ const startCountdown = () => {
 	}, 1000);
 };
 
-// 进入步骤3
-const goToStep3 = () => {
+// 进入步骤3（带后端验证码校验）
+const goToStep3 = async () => {
 	if (verificationCode.value.length !== 6) {
 		codeError.value = '请输入6位验证码';
 		return;
 	}
 	codeError.value = '';
-	currentStep.value = 3;
+	
+	// 调用后端校验验证码
+	if (!resetToken.value) {
+		codeError.value = '重置令牌无效，请重新获取验证码';
+		currentStep.value = 1;
+		return;
+	}
+	
+	isVerifying.value = true;
+	try {
+		const res = await authApi.verifyCode({
+			email: email.value,
+			code: verificationCode.value,
+		});
+		if (res.verified) {
+			emailToken.value = res.emailToken || '';
+			currentStep.value = 3;
+		} else {
+			codeError.value = '验证码错误或已过期';
+		}
+	} catch (error) {
+		codeError.value = error instanceof Error ? error.message : '验证码校验失败';
+	} finally {
+		isVerifying.value = false;
+	}
 };
 
 // 重置密码

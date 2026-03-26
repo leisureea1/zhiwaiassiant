@@ -1,29 +1,18 @@
-<script>
-	export default {
-		onLaunch: function() {
-			console.log('知外助手启动')
-			
-			// 检查登录状态
-			const accessToken = uni.getStorageSync('access_token')
-			const userInfo = uni.getStorageSync('user_info')
-			
-			if (accessToken && userInfo) {
-				// 已登录，跳转到首页
-				console.log('用户已登录，跳转到首页')
-				uni.switchTab({
-					url: '/pages/home/index'
-				})
-			} else {
-				console.log('用户未登录，保持在登录页')
-			}
-		},
-		onShow: function() {
-			console.log('App Show')
-		},
-		onHide: function() {
-			console.log('App Hide')
-		}
-	}
+<script setup lang="ts">
+import { onLaunch, onShow, onHide } from '@dcloudio/uni-app';
+import { debugLog } from '@/utils/debug';
+
+onLaunch(() => {
+	debugLog('知外助手启动');
+});
+
+onShow(() => {
+	debugLog('App Show');
+});
+
+onHide(() => {
+	debugLog('App Hide');
+});
 </script>
 
 <style lang="scss">

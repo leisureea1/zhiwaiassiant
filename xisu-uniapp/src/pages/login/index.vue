@@ -133,7 +133,8 @@ const handleLogin = async () => {
 		uni.showToast({ title: '请输入密码', icon: 'none' });
 		return;
 	}
-	
+	if (isLoading.value) return;
+
 	isLoading.value = true;
 	uni.showLoading({ title: '登录中...' });
 	
