@@ -322,7 +322,6 @@ const strengthClass = computed(() => strengthClasses[passwordStrength.value]);
 
 
 const strengthColor = computed(() => strengthColors[passwordStrength.value]);
-});
 
 // 步骤2: 邮箱
 const email = ref('');
@@ -460,8 +459,6 @@ const validateConfirmPassword = () => {
 		return;
 	}
 	confirmPasswordError.value = validatePasswordMatch(password.value, confirmPassword.value);
-};
-	}
 };
 
 // 邮箱验证
