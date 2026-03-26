@@ -25,6 +25,11 @@ func NewRouter(cfg *config.Config, db *gorm.DB, redisClient *redis.Client) *gin.
 	}
 	r.Static("/uploads/avatars", "./uploads/avatars")
 
+	uploadHandler := handlers.NewUploadHandler(db, "./uploads")
+
+	// 附件下载 - 公开但文件名为UUID，难以猜测
+	r.GET("/uploads/attachments/:filename", uploadHandler.ServeAttachment)
+
 	tokenSvc := service.NewTokenService(cfg.JWTSecret, cfg.JWTRefreshSecret, cfg.AccessTTL, cfg.RefreshTTL)
 	jwxtSvc := service.NewJwxtDirectService(redisClient)
 	mailSvc := service.NewMailService(cfg.MailHost, cfg.MailPort, cfg.MailUsername, cfg.MailPassword, cfg.MailFrom)
@@ -36,7 +41,6 @@ func NewRouter(cfg *config.Config, db *gorm.DB, redisClient *redis.Client) *gin.
 	annHandler := handlers.NewAnnouncementsHandler(db)
 	jwxtHandler := handlers.NewJWXTHandler(db, jwxtSvc)
 	adminHandler := handlers.NewAdminHandler(db)
-	uploadHandler := handlers.NewUploadHandler(db, "./uploads")
 
 	api := r.Group(cfg.APIPrefix)
 	{
@@ -74,8 +78,6 @@ func NewRouter(cfg *config.Config, db *gorm.DB, redisClient *redis.Client) *gin.
 			protected.POST("/users/:id/avatar/upload", uploadHandler.UploadAvatar)
 
 			protected.POST("/upload", uploadHandler.UploadFile)
-
-			protected.GET("/attachments/:filename", uploadHandler.ServeAttachment)
 
 			protected.GET("/announcements", annHandler.List)
 			protected.GET("/announcements/unviewed-count", annHandler.GetUnviewedCount)
