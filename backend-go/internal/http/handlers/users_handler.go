@@ -252,6 +252,14 @@ func (h *UsersHandler) AdminUpdate(c *gin.Context) {
 			response.Error(c, http.StatusBadRequest, "invalid role")
 			return
 		}
+		// 只有 SUPER_ADMIN 才能设置 SUPER_ADMIN 角色
+		if *req.Role == "SUPER_ADMIN" {
+			currentRole, exists := c.Get(middleware.ContextUserRole)
+			if !exists || currentRole.(string) != "SUPER_ADMIN" {
+				response.Error(c, http.StatusForbidden, "只有超级管理员才能设置超级管理员角色")
+				return
+			}
+		}
 		updates["role"] = *req.Role
 	}
 	if req.Status != nil {
