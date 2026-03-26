@@ -119,10 +119,10 @@ func (h *AnnouncementsHandler) GetUnviewedCount(c *gin.Context) {
 }
 
 type CreateAnnouncementRequest struct {
-	Title       string  `json:"title" binding:"required"`
-	Content     string  `json:"content" binding:"required"`
-	Summary     *string `json:"summary"`
-	Type        string  `json:"type"`
+	Title       string  `json:"title" binding:"required,max=200"`
+	Content     string  `json:"content" binding:"required,max=50000"`
+	Summary     *string `json:"summary" binding:"omitempty,max=500"`
+	Type        string  `json:"type" binding:"omitempty,oneof=NORMAL IMPORTANT URGENT"`
 	IsPinned    bool    `json:"isPinned"`
 	IsPopup     bool    `json:"isPopup"`
 	PublishedAt *string `json:"publishedAt"`
@@ -173,10 +173,10 @@ func (h *AnnouncementsHandler) Create(c *gin.Context) {
 }
 
 type UpdateAnnouncementRequest struct {
-	Title       *string `json:"title"`
-	Content     *string `json:"content"`
-	Summary     *string `json:"summary"`
-	Type        *string `json:"type"`
+	Title       *string `json:"title" binding:"omitempty,max=200"`
+	Content     *string `json:"content" binding:"omitempty,max=50000"`
+	Summary     *string `json:"summary" binding:"omitempty,max=500"`
+	Type        *string `json:"type" binding:"omitempty,oneof=NORMAL IMPORTANT URGENT"`
 	IsPinned    *bool   `json:"isPinned"`
 	IsPopup     *bool   `json:"isPopup"`
 	PublishedAt *string `json:"publishedAt"`
