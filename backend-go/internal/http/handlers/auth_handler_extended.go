@@ -236,15 +236,15 @@ func (h *ExtendedAuthHandler) SendVerificationCode(c *gin.Context) {
 	ctx := context.Background()
 	redisKey := VerificationCodePrefix + req.Email
 
-	// 检查邮箱是否已注册
+	// 检查邮箱是否已注册，但不暴露结果以防用户枚举
 	var count int64
+	emailAlreadyRegistered := false
 	if err := h.db.Model(&database.User{}).Where("email = ?", req.Email).Count(&count).Error; err != nil {
 		response.Error(c, http.StatusInternalServerError, "database error")
 		return
 	}
 	if count > 0 {
-		response.Error(c, http.StatusConflict, "该邮箱已被注册")
-		return
+		emailAlreadyRegistered = true
 	}
 
 	// 检查是否频繁发送
@@ -267,14 +267,16 @@ func (h *ExtendedAuthHandler) SendVerificationCode(c *gin.Context) {
 		return
 	}
 
-	// 发送邮件
-	if err := h.mailSvc.SendVerificationCode(req.Email, code); err != nil {
-		if isMailServiceUnavailable(err) {
-			response.Error(c, http.StatusServiceUnavailable, "邮件服务未配置或暂时不可用")
+	// 发送邮件（仅未注册的邮箱才实际发送）
+	if !emailAlreadyRegistered {
+		if err := h.mailSvc.SendVerificationCode(req.Email, code); err != nil {
+			if isMailServiceUnavailable(err) {
+				response.Error(c, http.StatusServiceUnavailable, "邮件服务未配置或暂时不可用")
+				return
+			}
+			response.Error(c, http.StatusInternalServerError, "验证码发送失败，请稍后再试")
 			return
 		}
-		response.Error(c, http.StatusInternalServerError, "验证码发送失败，请稍后再试")
-		return
 	}
 
 	if strings.ToLower(os.Getenv("APP_ENV")) != "production" {
