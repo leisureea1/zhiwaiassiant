@@ -177,10 +177,11 @@ func (s *JwxtDirectService) buildCachedSession(client *http.Client, username, pa
 }
 
 func getSessionSecret() string {
-	if v := strings.TrimSpace(os.Getenv("JWXT_SESSION_SECRET")); v != "" {
-		return v
+	v := strings.TrimSpace(os.Getenv("JWXT_SESSION_SECRET"))
+	if v == "" {
+		log.Printf("WARNING: JWXT_SESSION_SECRET not set, JWXT session encryption is disabled")
 	}
-	return strings.TrimSpace(os.Getenv("JWT_SECRET"))
+	return v
 }
 
 func encryptSessionPayload(payload []byte) (string, error) {
