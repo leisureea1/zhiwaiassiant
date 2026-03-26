@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>JWXT Go API 测试页</title>
+  <style>
+    :root {
+      --bg: #f4f6f9;
+      --card: #ffffff;
+      --text: #1b2430;
+      --muted: #5d6b7b;
+      --primary: #0d6efd;
+      --danger: #dc3545;
+      --ok: #198754;
+      --border: #d9e1ea;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: linear-gradient(120deg, #eef2f8, #f6fafc);
+      color: var(--text);
+    }
+    .wrap {
+      max-width: 1080px;
+      margin: 24px auto;
+      padding: 0 16px 24px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+      margin-bottom: 14px;
+      box-shadow: 0 10px 25px rgba(15, 34, 58, 0.05);
+    }
+    h1 { margin: 6px 0 4px; font-size: 24px; }
+    h2 { margin: 4px 0 12px; font-size: 18px; }
+    p { margin: 0 0 12px; color: var(--muted); }
+    .grid {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(12, 1fr);
+    }
+    .col-3 { grid-column: span 3; }
+    .col-4 { grid-column: span 4; }
+    .col-6 { grid-column: span 6; }
+    .col-8 { grid-column: span 8; }
+    .col-12 { grid-column: span 12; }
+    label { display: block; margin: 0 0 4px; font-size: 13px; color: var(--muted); }
+    input, select, button, textarea {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px;
+      font-size: 14px;
+      background: #fff;
+      color: var(--text);
+    }
+    textarea { min-height: 420px; font-family: Consolas, "Courier New", monospace; resize: vertical; }
+    button {
+      cursor: pointer;
+      border: none;
+      background: var(--primary);
+      color: #fff;
+      font-weight: 600;
+      transition: transform .08s ease, opacity .12s ease;
+    }
+    button:hover { opacity: .92; }
+    button:active { transform: translateY(1px); }
+    button.secondary { background: #6c757d; }
+    button.warn { background: #fd7e14; }
+    button.danger { background: var(--danger); }
+    .status { font-size: 13px; color: var(--muted); }
+    .status.ok { color: var(--ok); }
+    .status.err { color: var(--danger); }
+    .row-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .row-actions button { width: auto; padding: 10px 14px; }
+    @media (max-width: 900px) {
+      .col-3, .col-4, .col-6, .col-8 { grid-column: span 12; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>JWXT Go API 测试页</h1>
+      <p>用于验证 Go 版本 JWXT 实现（不依赖 Python）。输入 JWXT 账号密码后可一键测试“绑定 -> 学期 -> 课表”。</p>
+      <div class="grid">
+        <div class="col-8">
+          <label for="baseUrl">API Base URL</label>
+          <input id="baseUrl" type="text" placeholder="http://127.0.0.1:3000/api/v1">
+        </div>
+        <div class="col-4">
+          <label for="token">Access Token（自动填充）</label>
+          <input id="token" type="text" placeholder="Bearer token">
+        </div>
+      </div>
+      <div id="status" class="status">就绪</div>
+    </div>
+
+    <div class="card">
+      <h2>1. 主系统登录</h2>
+      <div class="grid">
+        <div class="col-4">
+          <label for="identifier">账号（用户名/邮箱/手机号）</label>
+          <input id="identifier" type="text" placeholder="identifier">
+        </div>
+        <div class="col-4">
+          <label for="password">密码</label>
+          <input id="password" type="password" placeholder="password">
+        </div>
+        <div class="col-4" style="display:flex;align-items:flex-end;">
+          <button id="btnLogin">登录并保存 Token</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>2. 绑定 JWXT 账号并联测</h2>
+      <div class="grid">
+        <div class="col-4">
+          <label for="jwxtUser">JWXT 用户名</label>
+          <input id="jwxtUser" type="text" placeholder="jwxt username">
+        </div>
+        <div class="col-4">
+          <label for="jwxtPass">JWXT 密码</label>
+          <input id="jwxtPass" type="password" placeholder="jwxt password">
+        </div>
+        <div class="col-4" style="display:flex;align-items:flex-end; gap:8px; flex-wrap:wrap;">
+          <button id="btnBind">绑定</button>
+          <button id="btnQuickJwxtTest" class="warn">一键测试JWXT</button>
+          <button id="btnUnbind" class="danger">解绑</button>
+        </div>
+      </div>
+      <p>一键测试会按顺序调用：POST /jwxt/bind -> GET /jwxt/semester -> GET /jwxt/course。</p>
+    </div>
+
+    <div class="card">
+      <h2>3. JWXT 接口调用</h2>
+      <div class="grid">
+        <div class="col-3">
+          <label for="semesterId">semester_id（可选）</label>
+          <input id="semesterId" type="text" placeholder="例如 209">
+        </div>
+        <div class="col-3" style="display:flex;align-items:flex-end;">
+          <button id="btnHealth" class="secondary">健康检查</button>
+        </div>
+      </div>
+
+      <div class="row-actions" style="margin-top:10px;">
+        <button data-api="GET /jwxt/user">用户信息</button>
+        <button data-api="GET /jwxt/semester">学期</button>
+        <button data-api="GET /jwxt/course">课表</button>
+        <button data-api="GET /jwxt/course/refresh" class="warn">刷新课表</button>
+        <button data-api="GET /jwxt/grade">成绩</button>
+        <button data-api="GET /jwxt/exam">考试</button>
+        <button data-api="GET /jwxt/evaluation/pending">待评教</button>
+        <button data-api="POST /jwxt/evaluation/auto" class="warn">一键评教</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>响应结果</h2>
+      <textarea id="output" readonly></textarea>
+    </div>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const statusEl = $("status");
+    const outputEl = $("output");
+
+    const DEFAULT_BASE = `${location.protocol}//${location.host}/api/v1`;
+    $("baseUrl").value = localStorage.getItem("jwxt_test_base_url") || DEFAULT_BASE;
+    $("token").value = localStorage.getItem("jwxt_test_token") || "";
+
+    function setStatus(msg, ok = true) {
+      statusEl.textContent = msg;
+      statusEl.className = ok ? "status ok" : "status err";
+    }
+
+    function writeOutput(title, data) {
+      const text = typeof data === "string" ? data : JSON.stringify(data, null, 2);
+      outputEl.value = `[${new Date().toLocaleString()}] ${title}\n${text}\n`;
+    }
+
+    function getBaseUrl() {
+      const base = $("baseUrl").value.trim().replace(/\/$/, "");
+      localStorage.setItem("jwxt_test_base_url", base);
+      return base;
+    }
+
+    function getHeaders(withAuth = true) {
+      const headers = { "Content-Type": "application/json" };
+      const token = $("token").value.trim();
+      if (withAuth && token) headers.Authorization = `Bearer ${token}`;
+      return headers;
+    }
+
+    async function apiRequest(method, path, body, withAuth = true) {
+      const url = `${getBaseUrl()}${path}`;
+      const opts = { method, headers: getHeaders(withAuth) };
+      if (body) opts.body = JSON.stringify(body);
+      const resp = await fetch(url, opts);
+      const text = await resp.text();
+      let json;
+      try { json = JSON.parse(text); } catch { json = text; }
+      if (!resp.ok) throw { status: resp.status, data: json };
+      return json;
+    }
+
+    $("btnLogin").addEventListener("click", async () => {
+      try {
+        setStatus("登录中...");
+        const data = await apiRequest("POST", "/auth/login", {
+          identifier: $("identifier").value.trim(),
+          password: $("password").value
+        }, false);
+        const token = data?.data?.accessToken || "";
+        if (token) {
+          $("token").value = token;
+          localStorage.setItem("jwxt_test_token", token);
+        }
+        setStatus("登录成功");
+        writeOutput("POST /auth/login", data);
+      } catch (e) {
+        setStatus("登录失败", false);
+        writeOutput("POST /auth/login ERROR", e);
+      }
+    });
+
+    $("btnBind").addEventListener("click", async () => {
+      try {
+        setStatus("绑定中...");
+        const data = await apiRequest("POST", "/jwxt/bind", {
+          username: $("jwxtUser").value.trim(),
+          password: $("jwxtPass").value
+        });
+        setStatus("绑定成功");
+        writeOutput("POST /jwxt/bind", data);
+      } catch (e) {
+        setStatus("绑定失败", false);
+        writeOutput("POST /jwxt/bind ERROR", e);
+      }
+    });
+
+    $("btnQuickJwxtTest").addEventListener("click", async () => {
+      try {
+        setStatus("开始一键测试：绑定 -> 学期 -> 课表...");
+
+        const bindResp = await apiRequest("POST", "/jwxt/bind", {
+          username: $("jwxtUser").value.trim(),
+          password: $("jwxtPass").value
+        });
+
+        const semesterResp = await apiRequest("GET", "/jwxt/semester", null);
+
+        let semesterId = $("semesterId").value.trim();
+        if (!semesterId) {
+          semesterId = semesterResp?.data?.current_semester_id
+            || semesterResp?.data?.current_semester
+            || "";
+        }
+
+        const coursePath = semesterId
+          ? `/jwxt/course?semester_id=${encodeURIComponent(semesterId)}`
+          : "/jwxt/course";
+        const courseResp = await apiRequest("GET", coursePath, null);
+
+        if (semesterId) {
+          $("semesterId").value = semesterId;
+        }
+
+        setStatus("一键测试成功");
+        writeOutput("JWXT 一键测试结果", {
+          bind: bindResp,
+          semester: semesterResp,
+          course: courseResp,
+          pickedSemesterId: semesterId || null
+        });
+      } catch (e) {
+        setStatus("一键测试失败", false);
+        writeOutput("JWXT 一键测试 ERROR", e);
+      }
+    });
+
+    $("btnUnbind").addEventListener("click", async () => {
+      try {
+        setStatus("解绑中...");
+        const data = await apiRequest("POST", "/jwxt/unbind", {});
+        setStatus("解绑成功");
+        writeOutput("POST /jwxt/unbind", data);
+      } catch (e) {
+        setStatus("解绑失败", false);
+        writeOutput("POST /jwxt/unbind ERROR", e);
+      }
+    });
+
+    $("btnHealth").addEventListener("click", async () => {
+      try {
+        setStatus("请求健康检查...");
+        const data = await apiRequest("GET", "/health", null, false);
+        setStatus("健康检查成功");
+        writeOutput("GET /health", data);
+      } catch (e) {
+        setStatus("健康检查失败", false);
+        writeOutput("GET /health ERROR", e);
+      }
+    });
+
+    document.querySelectorAll("button[data-api]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const [method, path] = btn.dataset.api.split(" ");
+        try {
+          setStatus(`请求 ${method} ${path} ...`);
+
+          let fullPath = path;
+          const semester = $("semesterId").value.trim();
+
+          if (path === "/jwxt/course" || path === "/jwxt/course/refresh" || path === "/jwxt/grade" || path === "/jwxt/exam") {
+            if (semester) fullPath += `?semester_id=${encodeURIComponent(semester)}`;
+          }
+
+          const data = await apiRequest(method, fullPath, method === "POST" ? {} : null);
+          setStatus(`${method} ${path} 成功`);
+          writeOutput(`${method} ${fullPath}`, data);
+        } catch (e) {
+          setStatus(`${method} ${path} 失败`, false);
+          writeOutput(`${method} ${path} ERROR`, e);
+        }
+      });
+    });
+  </script>
+</body>
+</html>

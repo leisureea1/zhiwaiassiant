@@ -1,0 +1,152 @@
+{
+	"pages": [
+		{
+			"path": "pages/login/index",
+			"style": {
+				"navigationStyle": "custom",
+				"navigationBarTitleText": "登录"
+			}
+		},
+		{
+			"path": "pages/register/index",
+			"style": {
+				"navigationStyle": "custom",
+				"navigationBarTitleText": "注册"
+			}
+		},
+		{
+			"path": "pages/forgot-password/index",
+			"style": {
+				"navigationStyle": "custom",
+				"navigationBarTitleText": "忘记密码"
+			}
+		},
+		{
+			"path": "pages/home/index",
+			"style": {
+				"navigationStyle": "custom",
+				"navigationBarTitleText": "首页"
+			}
+		},
+		{
+			"path": "pages/apps/index",
+			"style": {
+				"navigationStyle": "custom",
+				"navigationBarTitleText": "应用中心"
+			}
+		},
+		{
+			"path": "pages/profile/index",
+			"style": {
+				"navigationStyle": "custom",
+				"navigationBarTitleText": "个人中心"
+			}
+		},
+		{
+			"path": "pages/grades/index",
+			"style": {
+				"navigationStyle": "custom",
+				"navigationBarTitleText": "成绩查询"
+			}
+		},
+		{
+			"path": "pages/exams/index",
+			"style": {
+				"navigationStyle": "custom",
+				"navigationBarTitleText": "考试安排"
+			}
+		},
+		{
+			"path": "pages/bus/index",
+			"style": {
+				"navigationStyle": "custom",
+				"navigationBarTitleText": "校车时刻"
+			}
+		},
+		{
+			"path": "pages/evaluation/index",
+			"style": {
+				"navigationStyle": "custom",
+				"navigationBarTitleText": "评教系统"
+			}
+		},
+		{
+			"path": "pages/ai-chat/index",
+			"style": {
+				"navigationStyle": "custom",
+				"navigationBarTitleText": "AI助手"
+			}
+		},
+		{
+			"path": "pages/profile/bind-jwxt",
+			"style": {
+				"navigationStyle": "custom",
+				"navigationBarTitleText": "绑定教务系统"
+			}
+		},
+		{
+			"path": "pages/profile/update-jwxt-password",
+			"style": {
+				"navigationStyle": "custom",
+				"navigationBarTitleText": "更新教务系统密码"
+			}
+		},
+		{
+			"path": "pages/profile/change-password",
+			"style": {
+				"navigationStyle": "custom",
+				"navigationBarTitleText": "修改密码"
+			}
+		},
+		{
+			"path": "pages/profile/about",
+			"style": {
+				"navigationStyle": "custom",
+				"navigationBarTitleText": "关于我们"
+			}
+		},
+		{
+			"path": "pages/privacy-policy/index",
+			"style": {
+				"navigationStyle": "custom",
+				"navigationBarTitleText": "隐私政策"
+			}
+		},
+		{
+			"path": "pages/service-agreement/index",
+			"style": {
+				"navigationStyle": "custom",
+				"navigationBarTitleText": "用户服务协议"
+			}
+		}
+	],
+	"globalStyle": {
+		"navigationBarTextStyle": "black",
+		"navigationBarTitleText": "知外助手",
+		"navigationBarBackgroundColor": "#F8F8F8",
+		"backgroundColor": "#F8F8F8"
+	},
+	"tabBar": {
+		"custom": true,
+		"color": "#999999",
+		"selectedColor": "#3B82F6",
+		"backgroundColor": "#ffffff",
+		"borderStyle": "black",
+		"height": "50px",
+		"list": [
+			{
+				"pagePath": "pages/home/index",
+				"text": "首页"
+			},
+			{
+				"pagePath": "pages/apps/index",
+				"text": "应用"
+			},
+			{
+				"pagePath": "pages/profile/index",
+				"text": "我的"
+			}
+		]
+	},
+	"uniIdRouter": {}
+}

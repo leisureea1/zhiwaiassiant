@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>JWXT 直连测试</title>
+  <style>
+    body { font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; margin: 20px; background: #f6f8fb; color: #1d2733; }
+    .card { max-width: 980px; margin: 0 auto 12px; background: #fff; border: 1px solid #d8e0ea; border-radius: 10px; padding: 14px; }
+    .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 10px; }
+    .c4 { grid-column: span 4; }
+    .c6 { grid-column: span 6; }
+    .c12 { grid-column: span 12; }
+    input, button, textarea { width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid #c7d2df; border-radius: 8px; font-size: 14px; }
+    button { background: #0d6efd; color: #fff; border: none; cursor: pointer; font-weight: 600; }
+    button.secondary { background: #6c757d; }
+    button.warn { background: #fd7e14; }
+    textarea { min-height: 420px; font-family: Consolas, "Courier New", monospace; }
+    @media (max-width: 900px) { .c4,.c6 { grid-column: span 12; } }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>JWXT 直连测试（无需数据库）</h2>
+    <p>测试教务系统登录、用户信息、学期、课表、成绩、考试安排。启动命令：go run ./cmd/jwxt-test</p>
+    <div class="grid">
+      <div class="c6"><input id="base" placeholder="Base URL" value="http://127.0.0.1:3001"></div>
+      <div class="c6"><input id="sid" placeholder="登录后生成 sid"></div>
+      <div class="c4"><input id="username" placeholder="JWXT 用户名"></div>
+      <div class="c4"><input id="password" placeholder="JWXT 密码" type="password"></div>
+      <div class="c4"><input id="semester" placeholder="semester_id（可选）"></div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
+      <button id="btnLogin">登录并获取 sid</button>
+      <button id="btnUser" class="secondary">获取用户信息</button>
+      <button id="btnSemester" class="secondary">获取学期</button>
+      <button id="btnCourse" class="secondary">获取课表</button>
+      <button id="btnGrade" class="secondary">获取成绩</button>
+      <button id="btnExam" class="secondary">获取考试</button>
+      <button id="btnQuick" class="warn">一键登录+学期+课表</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <textarea id="out" readonly></textarea>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const out = $("out");
+
+    function jprint(title, data) {
+      out.value = `[${new Date().toLocaleString()}] ${title}\n${typeof data === "string" ? data : JSON.stringify(data, null, 2)}\n`;
+    }
+
+    function base() { return $("base").value.trim().replace(/\/$/, ""); }
+
+    async function req(method, path, body) {
+      const r = await fetch(base() + path, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: body ? JSON.stringify(body) : undefined
+      });
+      const t = await r.text();
+      let j;
+      try { j = JSON.parse(t); } catch { j = t; }
+      if (!r.ok) throw { status: r.status, data: j };
+      return j;
+    }
+
+    $("btnLogin").onclick = async () => {
+      try {
+        const data = await req("POST", "/api/jwxt/login", {
+          username: $("username").value.trim(),
+          password: $("password").value
+        });
+        $("sid").value = data.sid || "";
+        jprint("POST /api/jwxt/login", data);
+      } catch (e) { jprint("login error", e); }
+    };
+
+    $("btnSemester").onclick = async () => {
+      try {
+        const sid = encodeURIComponent($("sid").value.trim());
+        const data = await req("GET", `/api/jwxt/semester?sid=${sid}`);
+        jprint("GET /api/jwxt/semester", data);
+      } catch (e) { jprint("semester error", e); }
+    };
+
+    $("btnUser").onclick = async () => {
+      try {
+        const sid = encodeURIComponent($("sid").value.trim());
+        const data = await req("GET", `/api/jwxt/user?sid=${sid}`);
+        jprint("GET /api/jwxt/user", data);
+      } catch (e) { jprint("user error", e); }
+    };
+
+    $("btnCourse").onclick = async () => {
+      try {
+        const sid = encodeURIComponent($("sid").value.trim());
+        const sem = $("semester").value.trim();
+        const q = sem ? `&semester_id=${encodeURIComponent(sem)}` : "";
+        const data = await req("GET", `/api/jwxt/course?sid=${sid}${q}`);
+        jprint("GET /api/jwxt/course", data);
+      } catch (e) { jprint("course error", e); }
+    };
+
+    $("btnGrade").onclick = async () => {
+      try {
+        const sid = encodeURIComponent($("sid").value.trim());
+        const sem = $("semester").value.trim();
+        const q = sem ? `&semester_id=${encodeURIComponent(sem)}` : "";
+        const data = await req("GET", `/api/jwxt/grade?sid=${sid}${q}`);
+        jprint("GET /api/jwxt/grade", data);
+      } catch (e) { jprint("grade error", e); }
+    };
+
+    $("btnExam").onclick = async () => {
+      try {
+        const sid = encodeURIComponent($("sid").value.trim());
+        const sem = $("semester").value.trim();
+        const q = sem ? `&semester_id=${encodeURIComponent(sem)}` : "";
+        const data = await req("GET", `/api/jwxt/exam?sid=${sid}${q}`);
+        jprint("GET /api/jwxt/exam", data);
+      } catch (e) { jprint("exam error", e); }
+    };
+
+    $("btnQuick").onclick = async () => {
+      try {
+        const data = await req("POST", "/api/jwxt/quick", {
+          username: $("username").value.trim(),
+          password: $("password").value,
+          semester_id: $("semester").value.trim()
+        });
+        jprint("POST /api/jwxt/quick", data);
+      } catch (e) { jprint("quick error", e); }
+    };
+  </script>
+</body>
+</html>

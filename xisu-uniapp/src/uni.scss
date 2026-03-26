@@ -1,0 +1,93 @@
+/**
+ * 知外助手 - 全局样式变量
+ */
+
+/* 主题色 */
+$primary: #3B82F6;
+$primary-light: #60A5FA;
+$primary-dark: #2563EB;
+
+/* 背景色 */
+$bg-light: #F8FAFC;
+$bg-dark: #0F172A;
+$surface-light: #FFFFFF;
+$surface-dark: #1E293B;
+
+/* 文字颜色 */
+$text-primary: #1E293B;
+$text-secondary: #64748B;
+$text-light: #94A3B8;
+
+/* 边框色 */
+$border-color: #E2E8F0;
+$border-dark: #334155;
+
+/* 状态色 */
+$success: #10B981;
+$warning: #F59E0B;
+$danger: #EF4444;
+$info: #3B82F6;
+
+/* pastel色系 */
+$pastel-blue: #DBEAFE;
+$pastel-blue-text: #1E40AF;
+$pastel-pink: #FCE7F3;
+$pastel-pink-text: #9D174D;
+$pastel-purple: #EDE9FE;
+$pastel-purple-text: #6B21A8;
+$pastel-orange: #FFEDD5;
+$pastel-orange-text: #C2410C;
+$pastel-green: #D1FAE5;
+$pastel-green-text: #065F46;
+
+/* uni-app兼容变量 */
+$uni-color-primary: #3B82F6;
+$uni-color-success: #10B981;
+$uni-color-warning: #F59E0B;
+$uni-color-error: #EF4444;
+
+/* 文字基本颜色 */
+$uni-text-color:#1E293B;
+$uni-text-color-inverse:#fff;
+$uni-text-color-grey:#64748B;
+$uni-text-color-placeholder: #94A3B8;
+$uni-text-color-disable:#c0c0c0;
+
+/* 背景颜色 */
+$uni-bg-color:#ffffff;
+$uni-bg-color-grey:#F8FAFC;
+$uni-bg-color-hover:#f1f1f1;
+$uni-bg-color-mask:rgba(0, 0, 0, 0.4);
+
+/* 边框颜色 */
+$uni-border-color:#E2E8F0;
+
+/* 尺寸变量 */
+$uni-font-size-sm:24rpx;
+$uni-font-size-base:28rpx;
+$uni-font-size-lg:32rpx;
+
+/* 图片尺寸 */
+$uni-img-size-sm:40rpx;
+$uni-img-size-base:52rpx;
+$uni-img-size-lg:80rpx;
+
+/* Border Radius */
+$uni-border-radius-sm: 8rpx;
+$uni-border-radius-base: 16rpx;
+$uni-border-radius-lg: 24rpx;
+$uni-border-radius-xl: 32rpx;
+$uni-border-radius-circle: 50%;
+
+/* 水平间距 */
+$uni-spacing-row-sm: 10rpx;
+$uni-spacing-row-base: 20rpx;
+$uni-spacing-row-lg: 30rpx;
+
+/* 垂直间距 */
+$uni-spacing-col-sm: 8rpx;
+$uni-spacing-col-base: 16rpx;
+$uni-spacing-col-lg: 24rpx;
+
+/* 透明度 */
+$uni-opacity-disabled: 0.3;
