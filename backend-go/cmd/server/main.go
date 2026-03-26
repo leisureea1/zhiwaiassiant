@@ -9,6 +9,9 @@ import (
 	"xisu/backend-go/internal/http"
 )
 
+// Version is injected at build time via -ldflags, defaults to dev for local runs.
+var Version = "dev"
+
 func main() {
 	cfg := config.Load()
 	if len(strings.TrimSpace(cfg.JWTSecret)) < 16 {
@@ -30,6 +33,7 @@ func main() {
 	r := http.NewRouter(cfg, db, redisClient)
 
 	log.Printf("🚀 %s started at :%s", cfg.AppName, cfg.AppPort)
+	log.Printf("🏷️ Version: %s", Version)
 	log.Printf("📝 API Prefix: %s", cfg.APIPrefix)
 	log.Printf("🌍 Environment: %s", cfg.AppEnv)
 
