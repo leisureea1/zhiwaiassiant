@@ -19,8 +19,10 @@ func NewRouter(cfg *config.Config, db *gorm.DB, redisClient *redis.Client) *gin.
 	r.Use(middleware.SecurityHeaders())
 	r.Use(middleware.SystemLogger(db))
 
-	// 静态文件服务
-	r.StaticFile("/jwxt-test", "./static/jwxt_test.html")
+	// 仅开发环境暴露测试端点
+	if cfg.AppEnv != "production" {
+		r.StaticFile("/jwxt-test", "./static/jwxt_test.html")
+	}
 	r.Static("/uploads/avatars", "./uploads/avatars")
 
 	tokenSvc := service.NewTokenService(cfg.JWTSecret, cfg.JWTRefreshSecret, cfg.AccessTTL, cfg.RefreshTTL)
