@@ -66,8 +66,7 @@ func (s *JwxtDirectService) LoadSession(ctx context.Context, userID string) (*Ca
 	}
 	payload, err := decryptSessionPayload(raw)
 	if err != nil {
-		// 兼容旧版明文缓存
-		payload = []byte(raw)
+		return nil, fmt.Errorf("failed to decrypt session cache, old plaintext format is no longer supported")
 	}
 	var sess CachedJWXTSession
 	if err := json.Unmarshal(payload, &sess); err != nil {
