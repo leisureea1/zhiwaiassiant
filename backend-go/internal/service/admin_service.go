@@ -243,7 +243,7 @@ func writeEnvFile(envMap map[string]string) error {
 	}
 
 	content := strings.Join(lines, "\n")
-	return os.WriteFile(path, []byte(content), 0644)
+	return os.WriteFile(path, []byte(content), 0600)
 }
 
 func maskValue(value string) string {
