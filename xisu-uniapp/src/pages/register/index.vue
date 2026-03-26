@@ -51,7 +51,7 @@
 							type="text"
 							:password="!showPassword"
 							v-model="password"
-							placeholder="设置密码 (至少8位)" 
+							placeholder="设置密码 (至少8位，含大小写字母和数字)" 
 							placeholder-class="placeholder"
 							@input="validatePassword"
 						/>
@@ -479,6 +479,8 @@ const validatePassword = () => {
 		passwordError.value = '密码至少8位';
 	} else if (value.length > 20) {
 		passwordError.value = '密码最多20位';
+	} else if (!/[a-z]/.test(value) || !/[A-Z]/.test(value) || !/\d/.test(value)) {
+		passwordError.value = '密码需包含大小写字母和数字';
 	} else {
 		passwordError.value = '';
 	}

@@ -112,8 +112,8 @@ const handleSubmit = async () => {
 		uni.showToast({ title: '请输入新密码', icon: 'none' });
 		return;
 	}
-	if (newPassword.value.length < 6) {
-		uni.showToast({ title: '新密码至少6位', icon: 'none' });
+	if (newPassword.value.length < 8 || !/[a-z]/.test(newPassword.value) || !/[A-Z]/.test(newPassword.value) || !/\d/.test(newPassword.value)) {
+		uni.showToast({ title: '密码至少8位，需包含大小写字母和数字', icon: 'none' });
 		return;
 	}
 	if (newPassword.value !== confirmPassword.value) {
