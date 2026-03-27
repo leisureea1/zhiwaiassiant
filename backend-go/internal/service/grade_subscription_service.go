@@ -7,11 +7,18 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"sync"
 	"time"
 
 	"gorm.io/gorm"
 	"xisu/backend-go/internal/database"
 	"xisu/backend-go/internal/service/jwxt"
+)
+
+const (
+	maxConcurrentChecks = 3
+	maxRetries          = 2
+	retryDelay          = 5 * time.Second
 )
 
 type GradeSubscriptionService struct {
@@ -55,25 +62,87 @@ func (s *GradeSubscriptionService) runOnce() {
 		return
 	}
 
-	log.Printf("[GradeSubscription] Processing %d active subscriptions", len(subscriptions))
-	successCount := 0
-	failCount := 0
+	log.Printf("[GradeSubscription] Processing %d active subscriptions (concurrency: %d)", len(subscriptions), maxConcurrentChecks)
 
-	for _, sub := range subscriptions {
-		if err := s.checkUserGrades(ctx, &sub); err != nil {
-			log.Printf("[GradeSubscription] User %s check failed: %v", sub.UserID, err)
-			failCount++
-		} else {
-			successCount++
-		}
-		// Sleep briefly between users to avoid overwhelming the JWXT server
-		time.Sleep(2 * time.Second)
+	var (
+		mu          sync.Mutex
+		successCnt  int
+		failCnt     int
+		wg          sync.WaitGroup
+		sem         = make(chan struct{}, maxConcurrentChecks)
+	)
+
+	for i := range subscriptions {
+		wg.Add(1)
+		sem <- struct{}{} // acquire
+
+		go func(sub *database.GradeSubscription) {
+			defer wg.Done()
+			defer func() { <-sem }() // release
+
+			var err error
+			for attempt := 0; attempt <= maxRetries; attempt++ {
+				if attempt > 0 {
+					log.Printf("[GradeSubscription] User %s: retry %d/%d", sub.UserID, attempt, maxRetries)
+					time.Sleep(retryDelay)
+				}
+				err = s.checkUserGrades(ctx, sub)
+				if err == nil {
+					break
+				}
+			}
+
+			mu.Lock()
+			if err != nil {
+				log.Printf("[GradeSubscription] User %s check failed after retries: %v", sub.UserID, err)
+				failCnt++
+			} else {
+				successCnt++
+			}
+			mu.Unlock()
+		}(&subscriptions[i])
 	}
 
-	log.Printf("[GradeSubscription] Check cycle completed: %d success, %d failed", successCount, failCount)
+	wg.Wait()
+	log.Printf("[GradeSubscription] Check cycle completed: %d success, %d failed", successCnt, failCnt)
 }
 
-func (s *GradeSubscriptionService) checkUserGrades(_ context.Context, sub *database.GradeSubscription) error {
+// getOrCreateSession tries to reuse cached session from Redis first, only logs in if needed.
+func (s *GradeSubscriptionService) getOrCreateSession(ctx context.Context, userID, username, password string) (*jwxt.CachedJWXTSession, error) {
+	// Try loading cached session
+	sess, err := s.jwxtSvc.LoadSession(ctx, userID)
+	if err == nil && sess != nil {
+		// Check if session is still valid (validated within last 30 minutes)
+		if sess.ValidatedAt > 0 && time.Since(time.UnixMilli(sess.ValidatedAt)) < 30*time.Minute {
+			log.Printf("[GradeSubscription] User %s: using cached session", userID)
+			return sess, nil
+		}
+		// Validate the cached session
+		if s.jwxtSvc.ValidateSession(sess) {
+			sess.ValidatedAt = time.Now().UnixMilli()
+			// Update validated timestamp in Redis
+			_ = s.jwxtSvc.SaveSession(ctx, userID, sess, 50*time.Minute)
+			log.Printf("[GradeSubscription] User %s: cached session validated", userID)
+			return sess, nil
+		}
+		log.Printf("[GradeSubscription] User %s: cached session expired, logging in", userID)
+	}
+
+	// No valid cache, login
+	newSess, err := s.jwxtSvc.Login(username, password)
+	if err != nil {
+		return nil, fmt.Errorf("jwxt login failed: %w", err)
+	}
+	newSess.ValidatedAt = time.Now().UnixMilli()
+
+	// Save to Redis so normal requests can reuse it
+	_ = s.jwxtSvc.SaveSession(ctx, userID, newSess, 50*time.Minute)
+	log.Printf("[GradeSubscription] User %s: logged in and cached session", userID)
+
+	return newSess, nil
+}
+
+func (s *GradeSubscriptionService) checkUserGrades(ctx context.Context, sub *database.GradeSubscription) error {
 	// Get user info
 	var user database.User
 	if err := s.db.Where("id = ?", sub.UserID).First(&user).Error; err != nil {
@@ -84,10 +153,10 @@ func (s *GradeSubscriptionService) checkUserGrades(_ context.Context, sub *datab
 		return fmt.Errorf("user missing jwxt credentials or email")
 	}
 
-	// Login to JWXT
-	sess, err := s.jwxtSvc.Login(*user.JWXTUsername, *user.JWXTPassword)
+	// Get or create session (reuse cached, login only if needed)
+	sess, err := s.getOrCreateSession(ctx, sub.UserID, *user.JWXTUsername, *user.JWXTPassword)
 	if err != nil {
-		return fmt.Errorf("jwxt login failed: %w", err)
+		return err
 	}
 
 	// Get current semester
@@ -118,9 +187,6 @@ func (s *GradeSubscriptionService) checkUserGrades(_ context.Context, sub *datab
 		return fmt.Errorf("no current semester found")
 	}
 
-	// Update subscription semester ID
-	s.db.Model(sub).Update("semester_id", currentSemesterID)
-
 	// Get grades
 	gradeData, err := s.jwxtSvc.GetGrade(sess, currentSemesterID)
 	if err != nil {
@@ -144,10 +210,10 @@ func (s *GradeSubscriptionService) checkUserGrades(_ context.Context, sub *datab
 	if sub.LastGradeHash == nil {
 		log.Printf("[GradeSubscription] User %s: first check, recording baseline hash", sub.UserID)
 		s.db.Model(sub).Updates(map[string]any{
-			"last_checked_at":  time.Now(),
-			"last_grade_hash":  &newHash,
-			"semester_id":      currentSemesterID,
-			"updated_at":       time.Now(),
+			"last_checked_at": time.Now(),
+			"last_grade_hash": &newHash,
+			"semester_id":     currentSemesterID,
+			"updated_at":      time.Now(),
 		})
 		return nil
 	}
@@ -162,7 +228,7 @@ func (s *GradeSubscriptionService) checkUserGrades(_ context.Context, sub *datab
 		return nil
 	}
 
-	// Grades changed! Determine what's new
+	// Grades changed! Find semester name
 	semesterName := currentSemesterID
 	for _, sem := range semesters {
 		if id, ok := sem["id"].(string); ok && id == currentSemesterID {
@@ -175,9 +241,7 @@ func (s *GradeSubscriptionService) checkUserGrades(_ context.Context, sub *datab
 
 	// Build grade table HTML for the email
 	gradeTableHTML := s.buildGradeTableHTML(gradesRaw)
-
-// Calculate change count
-changeCount := len(gradesRaw.([]map[string]any))
+	changeCount := len(gradesRaw.([]map[string]any))
 
 	// Send notification email
 	realName := "同学"
@@ -198,6 +262,7 @@ changeCount := len(gradesRaw.([]map[string]any))
 		"last_grade_hash":  &newHash,
 		"last_notified_at": &now,
 		"total_notified":   sub.TotalNotified + 1,
+		"semester_id":      currentSemesterID,
 		"updated_at":       now,
 	})
 
@@ -222,7 +287,6 @@ func (s *GradeSubscriptionService) buildGradeTableHTML(gradesRaw any) string {
 
 	var rows strings.Builder
 	for i, row := range grades {
-
 		courseName := formatValue(row["课程名称"], row["课程"])
 		credits := formatValue(row["学分"])
 		score := formatScore(row)
