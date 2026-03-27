@@ -103,6 +103,11 @@ export const logsApi = {
   getStats: () => request.get('/admin/system-logs/stats'),
 }
 
+// 成绩订阅管理
+export const gradeSubscriptionApi = {
+  triggerCheck: () => request.post('/admin/grade-subscription/trigger'),
+}
+
 // 文件上传
 export const uploadApi = {
   uploadAttachment: (formData: FormData) =>

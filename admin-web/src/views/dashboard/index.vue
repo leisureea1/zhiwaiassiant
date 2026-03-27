@@ -68,7 +68,7 @@
               class="action-item"
               v-for="action in quickActions"
               :key="action.label"
-              @click="router.push(action.route)"
+              @click="action.handler ? action.handler() : router.push(action.route)"
             >
               <div class="action-icon" :style="{ backgroundColor: action.bgColor }">
                 <el-icon :size="22" :color="action.color"><component :is="action.icon" /></el-icon>
@@ -85,12 +85,35 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
-import { adminApi } from '@/api'
+import { adminApi, gradeSubscriptionApi } from '@/api'
 import dayjs from 'dayjs'
 
 const router = useRouter()
 const authStore = useAuthStore()
+
+const triggeringGrade = ref(false)
+
+const handleTriggerGradeCheck = async () => {
+  try {
+    await ElMessageBox.confirm(
+      '将立即触发一次成绩检查，遍历所有开启订阅的用户。此操作会在后台异步执行，请通过服务器日志查看结果。',
+      '手动触发成绩检查',
+      { type: 'info', confirmButtonText: '立即触发', cancelButtonText: '取消' },
+    )
+  } catch {
+    return
+  }
+  triggeringGrade.value = true
+  try {
+    await gradeSubscriptionApi.triggerCheck()
+    ElMessage.success('成绩检查已触发，请查看服务器日志了解结果')
+  } catch {
+    ElMessage.error('触发失败')
+  }
+  triggeringGrade.value = false
+}
 
 const stats = ref<any>({
   users: { total: 0, active: 0, newToday: 0 },
@@ -181,12 +204,12 @@ const pendingItems = computed(() => [
   },
 ])
 
-const quickActions = [
+const quickActions = computed(() => [
   { label: '发布公告', icon: 'Plus', color: '#3b82f6', bgColor: 'rgba(59,130,246,0.1)', route: '/announcements/create' },
   { label: '用户管理', icon: 'User', color: '#10b981', bgColor: 'rgba(16,185,129,0.1)', route: '/users' },
+  { label: '成绩检查', icon: 'Timer', color: '#f59e0b', bgColor: 'rgba(245,158,11,0.1)', handler: handleTriggerGradeCheck },
   { label: '系统日志', icon: 'Document', color: '#6366f1', bgColor: 'rgba(99,102,241,0.1)', route: '/logs' },
-  { label: '系统设置', icon: 'Setting', color: '#64748b', bgColor: 'rgba(100,116,139,0.1)', route: '/settings' },
-]
+])
 
 const fetchData = async () => {
   try {

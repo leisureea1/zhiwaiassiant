@@ -7,7 +7,6 @@ import (
 	"crypto/cipher"
 	crand "crypto/rand"
 	"crypto/sha256"
-	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -31,14 +30,9 @@ type JwxtDirectService struct {
 }
 
 func NewJwxtDirectService(redisClient *redis.Client) *JwxtDirectService {
-	transport := &http.Transport{
-		TLSClientConfig: &tls.Config{
-			MinVersion: tls.VersionTLS10,
-		},
-	}
 	return &JwxtDirectService{
 		redis: redisClient,
-		http:  &http.Client{Timeout: 20 * time.Second, Transport: transport},
+		http:  &http.Client{Timeout: 20 * time.Second},
 	}
 }
 
