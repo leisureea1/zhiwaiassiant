@@ -140,8 +140,20 @@ func (s *GradeSubscriptionService) checkUserGrades(_ context.Context, sub *datab
 
 	newHash := fmt.Sprintf("%x", sha256.Sum256(gradesJSON))
 
+	// First check: only record the hash, don't send notification
+	if sub.LastGradeHash == nil {
+		log.Printf("[GradeSubscription] User %s: first check, recording baseline hash", sub.UserID)
+		s.db.Model(sub).Updates(map[string]any{
+			"last_checked_at":  time.Now(),
+			"last_grade_hash":  &newHash,
+			"semester_id":      currentSemesterID,
+			"updated_at":       time.Now(),
+		})
+		return nil
+	}
+
 	// Check if grades changed
-	if sub.LastGradeHash != nil && *sub.LastGradeHash == newHash {
+	if *sub.LastGradeHash == newHash {
 		log.Printf("[GradeSubscription] User %s: no grade changes", sub.UserID)
 		s.db.Model(sub).Updates(map[string]any{
 			"last_checked_at": time.Now(),
