@@ -35,6 +35,11 @@ func (s *GradeSubscriptionService) Start() {
 	}
 }
 
+// RunOnce triggers a single check cycle. Safe to call from multiple goroutines.
+func (s *GradeSubscriptionService) RunOnce() {
+	s.runOnce()
+}
+
 func (s *GradeSubscriptionService) runOnce() {
 	log.Printf("[GradeSubscription] Running grade check cycle...")
 	ctx := context.Background()

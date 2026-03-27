@@ -41,10 +41,10 @@ func NewRouter(cfg *config.Config, db *gorm.DB, redisClient *redis.Client) *gin.
 	annHandler := handlers.NewAnnouncementsHandler(db)
 	jwxtHandler := handlers.NewJWXTHandler(db, jwxtSvc)
 	adminHandler := handlers.NewAdminHandler(db)
-	gradeSubHandler := handlers.NewGradeSubscriptionHandler(db)
+	gradeSubSvc := service.NewGradeSubscriptionService(db, jwxtSvc, mailSvc)
+	gradeSubHandler := handlers.NewGradeSubscriptionHandler(db, gradeSubSvc)
 
 	// Start grade subscription scheduler
-	gradeSubSvc := service.NewGradeSubscriptionService(db, jwxtSvc, mailSvc)
 	go gradeSubSvc.Start()
 
 	api := r.Group(cfg.APIPrefix)
@@ -126,6 +126,7 @@ func NewRouter(cfg *config.Config, db *gorm.DB, redisClient *redis.Client) *gin.
 				admin.DELETE("/announcements/:id", annHandler.Delete)
 				admin.POST("/announcements/:id/publish", annHandler.Publish)
 				admin.POST("/announcements/:id/pin", annHandler.TogglePin)
+			admin.POST("/grade-subscription/trigger", gradeSubHandler.TriggerCheck)
 			}
 
 			superAdmin := protected.Group("/admin")

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log"
 	"net/http"
 	"time"
 
@@ -10,14 +11,16 @@ import (
 	"xisu/backend-go/internal/database"
 	"xisu/backend-go/internal/http/middleware"
 	"xisu/backend-go/internal/http/response"
+	"xisu/backend-go/internal/service"
 )
 
 type GradeSubscriptionHandler struct {
-	db *gorm.DB
+	db      *gorm.DB
+	subSvc  *service.GradeSubscriptionService
 }
 
-func NewGradeSubscriptionHandler(db *gorm.DB) *GradeSubscriptionHandler {
-	return &GradeSubscriptionHandler{db: db}
+func NewGradeSubscriptionHandler(db *gorm.DB, subSvc *service.GradeSubscriptionService) *GradeSubscriptionHandler {
+	return &GradeSubscriptionHandler{db: db, subSvc: subSvc}
 }
 
 func (h *GradeSubscriptionHandler) GetSubscription(c *gin.Context) {
@@ -122,4 +125,15 @@ func (h *GradeSubscriptionHandler) UpdateSubscription(c *gin.Context) {
 		"enabled": *req.Enabled,
 		"message": "成绩订阅" + status + "，系统将每小时检查一次成绩变化并通过邮箱通知您",
 	})
+}
+
+// TriggerCheck manually triggers a grade check cycle (admin only).
+func (h *GradeSubscriptionHandler) TriggerCheck(c *gin.Context) {
+	log.Printf("[GradeSubscription] Manual trigger received")
+	if h.subSvc == nil {
+		response.Error(c, http.StatusServiceUnavailable, "subscription service not available")
+		return
+	}
+	go h.subSvc.RunOnce()
+	response.OK(c, gin.H{"message": "成绩检查已触发，请查看服务日志了解结果"})
 }
