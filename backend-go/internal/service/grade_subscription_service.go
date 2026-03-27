@@ -164,16 +164,8 @@ func (s *GradeSubscriptionService) checkUserGrades(_ context.Context, sub *datab
 	// Build grade table HTML for the email
 	gradeTableHTML := s.buildGradeTableHTML(gradesRaw)
 
-	// Calculate change count
-	changeCount := len(gradesRaw.([]any))
-	if sub.LastGradeHash != nil {
-		// If we have previous data, we just report total courses as updated
-		// In a more sophisticated implementation, we could diff the two
-		changeCount = len(gradesRaw.([]any))
-	} else {
-		// First check - notify about all current grades
-		changeCount = len(gradesRaw.([]any))
-	}
+// Calculate change count
+changeCount := len(gradesRaw.([]map[string]any))
 
 	// Send notification email
 	realName := "同学"
@@ -201,7 +193,7 @@ func (s *GradeSubscriptionService) checkUserGrades(_ context.Context, sub *datab
 }
 
 func (s *GradeSubscriptionService) buildGradeTableHTML(gradesRaw any) string {
-	grades, ok := gradesRaw.([]any)
+	grades, ok := gradesRaw.([]map[string]any)
 	if !ok || len(grades) == 0 {
 		return "<p style='color: #6b7280;'>暂无成绩数据</p>"
 	}
@@ -217,11 +209,7 @@ func (s *GradeSubscriptionService) buildGradeTableHTML(gradesRaw any) string {
 		<tbody>`
 
 	var rows strings.Builder
-	for i, g := range grades {
-		row, ok := g.(map[string]any)
-		if !ok {
-			continue
-		}
+	for i, row := range grades {
 
 		courseName := formatValue(row["课程名称"], row["课程"])
 		credits := formatValue(row["学分"])
