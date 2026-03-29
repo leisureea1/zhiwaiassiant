@@ -59,6 +59,7 @@ const debugError = (...args: unknown[]) => {
 export const saveTokens = (tokens: AuthTokens) => {
   uni.setStorageSync('access_token', tokens.accessToken);
   uni.setStorageSync('refresh_token', tokens.refreshToken);
+  tokenSavedAt = Date.now(); // 记录 token 保存时间
 };
 
 /**
@@ -75,6 +76,18 @@ export const clearTokens = () => {
   uni.removeStorageSync('access_token');
   uni.removeStorageSync('refresh_token');
   uni.removeStorageSync('user_info');
+  tokenSavedAt = null;
+};
+
+/**
+ * 初始化 token 状态（App 启动时调用）
+ * 如果 storage 中有 token，将 tokenSavedAt 设为当前时间
+ * 这样冷启动后的第一次请求不会触发不必要的 pre-refresh
+ */
+export const initTokenState = () => {
+  if (uni.getStorageSync('access_token')) {
+    tokenSavedAt = Date.now();
+  }
 };
 
 /**
@@ -109,6 +122,19 @@ export const getRefreshToken = (): string | null => {
 // Token 刷新状态管理
 let isRefreshing = false;
 let refreshSubscribers: Array<(token: string) => void> = [];
+
+// 记录 access_token 保存时的时间戳，用于 pre-refresh 判断
+let tokenSavedAt: number | null = null;
+const TOKEN_EXPIRE_MS = 15 * 60 * 1000; // 15 分钟
+const PRE_REFRESH_BUFFER_MS = 2 * 60 * 1000; // 提前 2 分钟刷新
+
+/**
+ * 判断 access_token 是否快过期（剩余时间不足 buffer）
+ */
+const isTokenExpiringSoon = (): boolean => {
+  if (!tokenSavedAt) return true; // 没有记录时间，保守刷新
+  return Date.now() - tokenSavedAt >= TOKEN_EXPIRE_MS - PRE_REFRESH_BUFFER_MS;
+};
 
 /**
  * 添加等待刷新的请求到队列
@@ -270,6 +296,27 @@ const requestWithToken = <T>(options: RequestOptions, token: string): Promise<T>
  */
 export const request = async <T = unknown>(options: RequestOptions): Promise<T> => {
   const { url, method = 'GET', data, header = {} } = options;
+  
+  // Pre-refresh: 如果 token 快过期，提前刷新，避免请求打 401
+  if (getAccessToken() && isTokenExpiringSoon() && !url.includes('/auth/')) {
+    if (!isRefreshing) {
+      try {
+        const newToken = await refreshAccessToken();
+        if (newToken) {
+          header['Authorization'] = `Bearer ${newToken}`;
+        }
+      } catch {
+        // refresh 失败，继续用旧 token 发请求，由 401 兜底处理
+      }
+    } else {
+      // 正在刷新，等待刷新完成后获取新 token
+      await new Promise<string>((resolve) => {
+        subscribeTokenRefresh((token) => resolve(token));
+      }).then((token) => {
+        header['Authorization'] = `Bearer ${token}`;
+      });
+    }
+  }
   
   // 获取token
   const token = getAccessToken();

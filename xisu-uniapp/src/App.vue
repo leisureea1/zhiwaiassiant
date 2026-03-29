@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { onLaunch, onShow, onHide } from '@dcloudio/uni-app';
 import { debugLog } from '@/utils/debug';
+import { initTokenState } from '@/services/apiService';
 
 onLaunch(() => {
 	debugLog('知外助手启动');
+	initTokenState();
 });
 
 onShow(() => {
