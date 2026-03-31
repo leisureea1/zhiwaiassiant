@@ -62,6 +62,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '系统日志', icon: 'Document' },
       },
       {
+        path: 'email-broadcast',
+        name: 'EmailBroadcast',
+        component: () => import('@/views/email-broadcast/index.vue'),
+        meta: { title: '邮件群发', icon: 'Message' },
+      },
+      {
         path: 'settings',
         name: 'Settings',
         component: () => import('@/views/settings/index.vue'),

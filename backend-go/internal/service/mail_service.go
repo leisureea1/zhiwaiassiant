@@ -122,6 +122,11 @@ func (s *MailService) SendPasswordReset(to, code string) error {
 	return s.sendMail(to, subject, body)
 }
 
+// SendCustomMail 发送自定义邮件（支持富文本HTML）
+func (s *MailService) SendCustomMail(to, subject, htmlContent string) error {
+	return s.sendMail(to, subject, htmlContent)
+}
+
 func (s *MailService) sendMail(to, subject, body string) error {
 	if strings.TrimSpace(s.host) == "" || strings.TrimSpace(s.port) == "" {
 		return errors.New("smtp host or port is empty")

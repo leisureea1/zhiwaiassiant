@@ -108,6 +108,12 @@ export const gradeSubscriptionApi = {
   triggerCheck: () => request.post('/admin/grade-subscription/trigger'),
 }
 
+// 邮件群发
+export const emailApi = {
+  broadcast: (data: { subject: string; content: string; target: string; role: string }) =>
+    request.post('/admin/email/broadcast', data),
+}
+
 // 文件上传
 export const uploadApi = {
   uploadAttachment: (formData: FormData) =>
