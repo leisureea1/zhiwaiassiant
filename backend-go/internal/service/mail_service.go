@@ -140,16 +140,14 @@ func (s *MailService) sendMail(to, subject, body string) error {
 
 	auth := smtp.PlainAuth("", s.username, s.password, s.host)
 
-	msg := []byte(fmt.Sprintf(
-		"From: %s\r\n"+
-			"To: %s\r\n"+
-			"Subject: %s\r\n"+
-			"MIME-Version: 1.0\r\n"+
-			"Content-Type: text/html; charset=UTF-8\r\n"+
-			"\r\n"+
-			"%s",
-		s.from, to, subject, body,
-	))
+	headers := "From: " + s.from + "\r\n" +
+		"To: " + to + "\r\n" +
+		"Subject: " + subject + "\r\n" +
+		"MIME-Version: 1.0\r\n" +
+		"Content-Type: text/html; charset=UTF-8\r\n" +
+		"\r\n" +
+		body
+	msg := []byte(headers)
 
 	addr := fmt.Sprintf("%s:%s", s.host, s.port)
 
