@@ -1,10 +1,10 @@
 package handlers
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -222,24 +222,26 @@ func (h *AdminHandler) SendBulkEmail(c *gin.Context) {
 			displayName = user.Username
 		}
 
-		personalizedContent := fmt.Sprintf(`
+		personalizedContent := `
 			<div style="max-width: 600px; margin: 0 auto; padding: 20px; font-family: 'Microsoft YaHei', sans-serif;">
 				<div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px 10px 0 0;">
 					<h1 style="color: white; margin: 0; text-align: center;">知外助手</h1>
 				</div>
 				<div style="background: #ffffff; padding: 40px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px;">
 					<p style="color: #6b7280; font-size: 16px; line-height: 1.6;">
-						尊敬的 <strong>%s</strong>，您好！
+						尊敬的 <strong>{{USER_NAME}}</strong>，您好！
 					</p>
 					<hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
-					%s
+					{{CONTENT}}
 					<hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
 					<p style="color: #9ca3af; font-size: 12px; text-align: center;">
 						此邮件由知外助手管理后台发送，请勿直接回复
 					</p>
 				</div>
 			</div>
-		`, displayName, req.Content)
+		`
+		personalizedContent = strings.Replace(personalizedContent, "{{USER_NAME}}", displayName, 1)
+		personalizedContent = strings.Replace(personalizedContent, "{{CONTENT}}", req.Content, 1)
 
 		if err := h.mailService.SendCustomMail(*user.Email, req.Subject, personalizedContent); err != nil {
 			log.Printf("[SendBulkEmail] Failed to send to %s: %v", *user.Email, err)
