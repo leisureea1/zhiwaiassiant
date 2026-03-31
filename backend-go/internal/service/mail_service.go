@@ -140,7 +140,9 @@ func (s *MailService) sendMail(to, subject, body string) error {
 
 	auth := smtp.PlainAuth("", s.username, s.password, s.host)
 
-	headers := "From: " + s.from + "\r\n" +
+	// 构造显示名为"知外助手"的 From 头
+	fromHeader := "知外助手 <" + s.from + ">"
+	headers := "From: " + fromHeader + "\r\n" +
 		"To: " + to + "\r\n" +
 		"Subject: " + subject + "\r\n" +
 		"MIME-Version: 1.0\r\n" +
