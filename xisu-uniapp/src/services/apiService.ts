@@ -658,8 +658,16 @@ export interface SemesterInfo {
 export interface SemesterData {
   success: boolean;
   data?: {
-    semesters: SemesterInfo[];
+    success?: boolean;
+    semesters?: SemesterInfo[];
     current_semester?: string;
+    current_semester_id?: string;
+    data?: {
+      success?: boolean;
+      semesters?: SemesterInfo[];
+      current_semester?: string;
+      current_semester_id?: string;
+    };
   };
   error?: string;
 }

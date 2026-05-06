@@ -417,6 +417,14 @@ func stripTags(in string) string {
 	return strings.TrimSpace(s)
 }
 
+func isJWXTLoginPage(html string) bool {
+	lower := strings.ToLower(html)
+	if strings.Contains(lower, "cas/login") || strings.Contains(lower, `name="username"`) && strings.Contains(lower, `name="password"`) {
+		return true
+	}
+	return strings.Contains(html, "统一身份认证") || strings.Contains(html, "用户名") && strings.Contains(html, "密码")
+}
+
 func parseFloatAny(v any) float64 {
 	s := strings.TrimSpace(fmt.Sprintf("%v", v))
 	if s == "" || s == "<nil>" {

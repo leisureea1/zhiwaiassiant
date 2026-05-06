@@ -130,6 +130,17 @@ const emptyMessage = ref('请选择学期查看考试安排');
 const detailVisible = ref(false);
 const selectedExam = ref<ExamItem | null>(null);
 
+type SemesterPayload = {
+	semesters?: SemesterInfo[];
+	current_semester?: string;
+	current_semester_id?: string;
+	data?: SemesterPayload;
+};
+
+const normalizeSemesterPayload = (res: SemesterPayload): SemesterPayload => {
+	return res?.semesters ? res : (res?.data?.semesters ? res.data : res);
+};
+
 // 格式化学期名称
 const formatSemesterName = (name: string) => {
 	const match = name.match(/(\d{4})-(\d{4})学年第([一二])学期/);
@@ -263,13 +274,16 @@ const getDetailItems = (exam: ExamItem) => {
 const loadSemesters = async () => {
 	try {
 		const res = await jwxtApi.getSemesters();
-		if (res.data?.semesters) {
-			semesters.value = res.data.semesters;
+		const semesterPayload = normalizeSemesterPayload(res.data || {});
+		if (semesterPayload.semesters) {
+			semesters.value = semesterPayload.semesters;
 			const current = semesters.value.find(s => s.current);
 			if (current) {
 				currentSemesterId.value = current.id;
-			} else if (res.data.current_semester) {
-				currentSemesterId.value = res.data.current_semester;
+			} else if (semesterPayload.current_semester_id) {
+				currentSemesterId.value = semesterPayload.current_semester_id;
+			} else if (semesterPayload.current_semester) {
+				currentSemesterId.value = semesterPayload.current_semester;
 			} else if (semesters.value.length > 0) {
 				currentSemesterId.value = semesters.value[0].id;
 			}

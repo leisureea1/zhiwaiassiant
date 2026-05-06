@@ -136,26 +136,53 @@ func (h *JWXTHandler) Exam(c *gin.Context) {
 		response.Error(c, http.StatusBadGateway, err.Error())
 		return
 	}
-	_ = h.service.SaveSession(context.Background(), userID, sess, jwxtSessionTTL)
-	
+	if success, ok := data["success"].(bool); ok && !success {
+		h.service.ClearSession(context.Background(), userID)
+		sess, err = h.getOrCreateSession(c.Request.Context(), userID)
+		if err != nil {
+			response.Error(c, http.StatusBadRequest, err.Error())
+			return
+		}
+		data, err = h.service.GetExam(sess, c.Query("semester_id"))
+		if err != nil {
+			response.Error(c, http.StatusBadGateway, err.Error())
+			return
+		}
+	}
+	success := true
+	if v, ok := data["success"].(bool); ok {
+		success = v
+	}
+	if success {
+		_ = h.service.SaveSession(context.Background(), userID, sess, jwxtSessionTTL)
+	} else {
+		h.service.ClearSession(context.Background(), userID)
+	}
+
 	// 包装成前端期望的格式 - 匹配 Python backend 的响应结构
 	exams, ok := data["exams"].([]map[string]any)
 	if !ok {
 		exams = []map[string]any{}
 	}
-	
+
 	innerData := gin.H{
-		"success":     true,
+		"success":     success,
 		"exams":       exams,
 		"total":       len(exams),
 		"semester_id": data["semester"],
 	}
-	
+	if errMsg, ok := data["error"]; ok {
+		innerData["error"] = errMsg
+	}
+
 	outerData := gin.H{
-		"success": true,
+		"success": success,
 		"data":    innerData,
 	}
-	
+	if errMsg, ok := data["error"]; ok {
+		outerData["error"] = errMsg
+	}
+
 	respondNestSuccess(c, outerData)
 }
 

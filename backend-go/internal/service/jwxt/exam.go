@@ -19,9 +19,15 @@ func (s *JwxtDirectService) GetExam(sess *CachedJWXTSession, semesterID string) 
 	if err != nil {
 		return nil, err
 	}
-	if strings.Contains(body, "用户名") && strings.Contains(body, "密码") {
-		return map[string]any{"exams": []any{}, "semester": semesterID}, nil
+	if isJWXTLoginPage(body) {
+		return map[string]any{
+			"success":  false,
+			"error":    "需要重新登录教务系统",
+			"exams":    []map[string]any{},
+			"semester": semesterID,
+		}, nil
 	}
+
 	exams := parseHTMLTableRows(body)
-	return map[string]any{"exams": exams, "semester": semesterID}, nil
+	return map[string]any{"success": true, "exams": exams, "semester": semesterID}, nil
 }

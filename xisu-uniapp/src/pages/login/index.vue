@@ -17,11 +17,7 @@
 				</view>
 			</view>
 
-			<!-- 升级提示 -->
-			<view class="upgrade-notice">
-				<text class="iconfont icon-info" style="font-size: 28rpx; color: #f59e0b; margin-right: 12rpx;"></text>
-				<text class="notice-text">服务器升级，原账户数据已重置，请重新注册。</text>
-			</view>
+		
 
 			<!-- 表单区域 -->
 			<view class="form-section">

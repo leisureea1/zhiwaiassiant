@@ -136,11 +136,15 @@ func parseCourseActivities(html string) []map[string]any {
 		if teacher == "" {
 			teacher = cleanQuoted(params[1])
 		}
-		courseName := strings.TrimSpace(strings.Split(cleanQuoted(params[3]), "(")[0])
+		rawCourseName := cleanQuoted(params[3])
+		courseName := strings.TrimSpace(strings.Split(rawCourseName, "(")[0])
 		if shouldSkipCourseName(courseName) {
 			continue
 		}
 		classroom := cleanQuoted(params[5])
+		if isOnlineCourse(rawCourseName, courseName, classroom) {
+			continue
+		}
 		timePattern := cleanQuoted(params[6])
 
 		timeSlots := parseTimeSlots(m[2])
@@ -199,6 +203,48 @@ func shouldSkipCourseName(name string) bool {
 	}
 
 	return false
+}
+
+func isOnlineCourse(rawName, name, classroom string) bool {
+	fields := []string{rawName, name, classroom}
+	for _, field := range fields {
+		n := normalizeCourseText(field)
+		if n == "" {
+			continue
+		}
+
+		markers := []string{
+			"网上课程",
+			"网络课程",
+			"线上课程",
+			"在线课程",
+			"网课",
+			"慕课",
+			"mooc",
+			"online",
+		}
+		for _, marker := range markers {
+			if strings.Contains(n, marker) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func normalizeCourseText(s string) string {
+	s = strings.TrimSpace(strings.ToLower(s))
+	replacer := strings.NewReplacer(
+		" ", "",
+		"\t", "",
+		"\r", "",
+		"\n", "",
+		"（", "(",
+		"）", ")",
+		"：", ":",
+	)
+	return replacer.Replace(s)
 }
 
 func splitCSVArgs(in string) []string {
