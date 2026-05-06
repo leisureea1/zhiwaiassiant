@@ -126,6 +126,18 @@ const semesters = ref<SemesterInfo[]>([]);
 const exams = ref<ExamItem[]>([]);
 const emptyMessage = ref('请选择学期查看考试安排');
 
+const isDev = import.meta.env.DEV;
+const debugLog = (...args: unknown[]) => {
+	if (isDev) {
+		console.log(...args);
+	}
+};
+const debugError = (...args: unknown[]) => {
+	if (isDev) {
+		console.error(...args);
+	}
+};
+
 // 详情弹窗
 const detailVisible = ref(false);
 const selectedExam = ref<ExamItem | null>(null);
@@ -140,6 +152,31 @@ type SemesterPayload = {
 const normalizeSemesterPayload = (res: SemesterPayload): SemesterPayload => {
 	return res?.semesters ? res : (res?.data?.semesters ? res.data : res);
 };
+
+type ExamPayload = {
+	success?: boolean;
+	exams?: ExamItem[];
+	total?: number;
+	semester_id?: string;
+	data?: ExamPayload;
+	error?: string;
+	message?: string;
+};
+
+const normalizeExamPayload = (res: ExamPayload): ExamPayload => {
+	return res?.exams ? res : (res?.data?.exams ? res.data : res);
+};
+
+const normalizeExamItem = (exam: ExamItem): ExamItem => ({
+	...exam,
+	course_name: exam.course_name || String(exam['课程名称'] || exam['课程'] || exam['科目'] || ''),
+	exam_time: exam.exam_time || String(exam['考试安排'] || exam['考试时间'] || exam['时间'] || ''),
+	exam_date: exam.exam_date || String(exam['考试日期'] || ''),
+	location: exam.location || String(exam['考试地点'] || exam['地点'] || exam['教室'] || ''),
+	seat: exam.seat || String(exam['座位号'] || exam['座位'] || exam['座号'] || ''),
+	exam_type: exam.exam_type || String(exam['考试类别'] || exam['考试类型'] || exam['类型'] || ''),
+	status: exam.status || String(exam['考试情况'] || ''),
+});
 
 // 格式化学期名称
 const formatSemesterName = (name: string) => {
@@ -274,18 +311,21 @@ const getDetailItems = (exam: ExamItem) => {
 const loadSemesters = async () => {
 	try {
 		const res = await jwxtApi.getSemesters();
-		const semesterPayload = normalizeSemesterPayload(res.data || {});
+		const semesterPayload = normalizeSemesterPayload((res.data || res || {}) as SemesterPayload);
 		if (semesterPayload.semesters) {
-			semesters.value = semesterPayload.semesters;
+			semesters.value = semesterPayload.semesters.map(term => ({
+				...term,
+				id: String(term.id),
+			}));
 			const current = semesters.value.find(s => s.current);
 			if (current) {
-				currentSemesterId.value = current.id;
+				currentSemesterId.value = String(current.id);
 			} else if (semesterPayload.current_semester_id) {
-				currentSemesterId.value = semesterPayload.current_semester_id;
+				currentSemesterId.value = String(semesterPayload.current_semester_id);
 			} else if (semesterPayload.current_semester) {
-				currentSemesterId.value = semesterPayload.current_semester;
+				currentSemesterId.value = String(semesterPayload.current_semester);
 			} else if (semesters.value.length > 0) {
-				currentSemesterId.value = semesters.value[0].id;
+				currentSemesterId.value = String(semesters.value[0].id);
 			}
 		}
 	} catch (error) {
@@ -305,8 +345,9 @@ const loadExams = async () => {
 		const res = await jwxtApi.getExams(currentSemesterId.value);
 		debugLog('[Exams] Response:', JSON.stringify(res));
 		
-		if (res.data?.success && res.data.exams) {
-			exams.value = res.data.exams;
+		const examPayload = normalizeExamPayload((res.data || res || {}) as ExamPayload);
+		if (examPayload.success !== false && Array.isArray(examPayload.exams)) {
+			exams.value = examPayload.exams.map(normalizeExamItem);
 			if (exams.value.length === 0) {
 				emptyMessage.value = '本学期暂无考试安排';
 			}
@@ -325,10 +366,8 @@ const loadExams = async () => {
 
 // 选择学期
 const selectSemester = (semesterId: string) => {
-	if (currentSemesterId.value !== semesterId) {
-		currentSemesterId.value = semesterId;
-		loadExams();
-	}
+	currentSemesterId.value = String(semesterId);
+	loadExams();
 };
 
 // 刷新
