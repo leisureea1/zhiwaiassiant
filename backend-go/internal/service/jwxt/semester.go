@@ -1,6 +1,8 @@
 package jwxt
 
 import (
+	"fmt"
+	"net/http"
 	"net/url"
 	"regexp"
 	"strings"
@@ -53,14 +55,25 @@ func (s *JwxtDirectService) GetSemester(sess *CachedJWXTSession) (map[string]any
 	}
 
 	current := ""
+	currentName := s.getCurrentSemesterName(client)
+
 	for _, sem := range options {
-		if v, ok := sem["current"].(bool); ok && v {
+		name := strings.TrimSpace(sem["name"].(string))
+		if normalizeSemesterText(name) == normalizeSemesterText(currentName) && currentName != "" {
+			sem["current"] = true
 			current = sem["id"].(string)
-			break
+		} else {
+			sem["current"] = false
 		}
 	}
+
 	if current == "" {
 		current = s.getCurrentSemesterID(client)
+		for _, sem := range options {
+			if sem["id"] == current {
+				sem["current"] = true
+			}
+		}
 	}
 
 	return map[string]any{
@@ -75,7 +88,6 @@ func extractSemesterOptions(html string) []map[string]any {
 	tags := optionTagRe.FindAllString(html, -1)
 	out := make([]map[string]any, 0, len(tags))
 	for _, tag := range tags {
-		attrsLower := strings.ToLower(tag)
 		id := extractAttr(tag, "value")
 		if id == "" {
 			if m := regexp.MustCompile(`(?is)\bvalue\s*=\s*([0-9]+)`).FindStringSubmatch(tag); len(m) > 1 {
@@ -92,10 +104,45 @@ func extractSemesterOptions(html string) []map[string]any {
 		}
 		name := strings.TrimSpace(stripTags(textMatch[1]))
 		item := map[string]any{"id": strings.TrimSpace(id), "name": name}
-		if strings.Contains(attrsLower, "selected") {
-			item["current"] = true
-		}
 		out = append(out, item)
 	}
 	return out
+}
+
+func (s *JwxtDirectService) getCurrentSemesterName(client *http.Client) string {
+	body, err := s.get(client, jwxtBaseURL+"/eams/home.action")
+	if err != nil {
+		return ""
+	}
+
+	re := regexp.MustCompile(`(\d{4}[-—]\d{4})\s*学年\s*第?\s*([12])\s*学期`)
+	m := re.FindStringSubmatch(body)
+
+	if len(m) < 3 {
+		return ""
+	}
+
+	year := strings.ReplaceAll(m[1], "—", "-")
+	return fmt.Sprintf("%s-%s", year, m[2])
+}
+
+func normalizeSemesterText(s string) string {
+	s = strings.TrimSpace(s)
+
+	re := regexp.MustCompile(`(\d{4}[-—]\d{4})`)
+	year := re.FindString(s)
+	year = strings.ReplaceAll(year, "—", "-")
+
+	term := ""
+	if strings.Contains(s, "第1学期") || strings.HasSuffix(s, "-1") || strings.Contains(s, "1学期") {
+		term = "1"
+	} else if strings.Contains(s, "第2学期") || strings.HasSuffix(s, "-2") || strings.Contains(s, "2学期") {
+		term = "2"
+	}
+
+	if year == "" || term == "" {
+		return s
+	}
+
+	return fmt.Sprintf("%s-%s", year, term)
 }
