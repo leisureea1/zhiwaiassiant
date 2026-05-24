@@ -96,7 +96,7 @@ func (s *JwxtDirectService) getStudentID(client *http.Client) string {
 }
 
 func (s *JwxtDirectService) getCurrentSemesterID(client *http.Client) string {
-	currentName := s.getCurrentSemesterName(client)
+	currentName, _ := s.getCurrentSemesterInfo(client)
 	if strings.TrimSpace(currentName) != "" {
 		form := url.Values{}
 		form.Set("dataType", "semester")

@@ -293,43 +293,10 @@ const getSelectedSemesterStart = (): Date => {
 	}
 	
 	// 兜底：根据当前日期推断
-	return getCurrentSemesterStart();
+	return new Date(); // 周数完全依赖后端 current_week
 };
 
-// 获取当前学期的开始日期（根据系统日期推断，用于计算实际周数）
-const getCurrentSemesterStart = (): Date => {
-	const now = new Date();
-	const year = now.getFullYear();
-	const month = now.getMonth() + 1;
-
-	// 春季学期：3月2日开始
-	if (month >= 3 && month <= 7) {
-		return new Date(year, 2, 2); // 3月2日
-	}
-	// 秋季学期：9月1日开始
-	else if (month >= 9 || month <= 1) {
-		const semesterYear = month >= 9 ? year : year - 1;
-		return new Date(semesterYear, 8, 1); // 9月1日
-	}
-	// 2月份期间（寒假）仍按上一年秋季学期计算
-	else {
-		return new Date(year - 1, 8, 1); // 上一年9月1日
-	}
-};
-
-// 计算周数
-const getWeekNumber = (semesterStart: Date, currentDate: Date = new Date()): number => {
-	const diffTime = currentDate.getTime() - semesterStart.getTime();
-	const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-	return Math.ceil(diffDays / 7);
-};
-
-// 检查是否在假期中
-const isInVacation = (currentDate: Date = new Date()): boolean => {
-	const semesterStart = getCurrentSemesterStart();
-	const weekNumber = getWeekNumber(semesterStart, currentDate);
-	return weekNumber < 1 || weekNumber > TOTAL_WEEKS;
-};
+// 获取假期祝福语
 
 // 获取假期祝福语
 const getVacationGreeting = (currentDate: Date = new Date()): string => {
@@ -497,20 +464,21 @@ const fetchSemestersFromServer = async () => {
 				currentSemesterId.value = semesters.value[0].id;
 			}
 
+			// 使用后端返回的教学周数
+			if (typeof semesterPayload.current_week === 'number' && semesterPayload.current_week > 0) {
+				actualCurrentWeek.value = semesterPayload.current_week;
+				currentWeek.value = actualCurrentWeek.value;
+				isVacation.value = false;
+				updateWeekDays();
+			}
+
 			// 保存到缓存
 			saveSemestersCache(semesters.value, currentSemesterId.value);
-			debugLog('[Home] Loaded semesters:', semesters.value.length, 'current:', currentSemesterId.value);
+			debugLog('[Home] Loaded semesters:', semesters.value.length, 'current:', currentSemesterId.value, 'week:', actualCurrentWeek.value);
 		}
 	} catch (error) {
 		debugError('[Home] Failed to load semesters:', error);
 	}
-};
-
-// 计算当前是第几周
-const calculateCurrentWeek = (): number => {
-	const semesterStart = getCurrentSemesterStart();
-	const week = getWeekNumber(semesterStart);
-	return Math.max(1, Math.min(week, TOTAL_WEEKS));
 };
 
 // 周数提示文字
@@ -993,18 +961,9 @@ onMounted(async () => {
 		headerRightPadding.value = '0px';
 	}
 	
-	// 检查是否在假期
-	isVacation.value = isInVacation();
-	if (isVacation.value) {
-		vacationGreeting.value = getVacationGreeting();
-		// 假期期间默认显示第1周
-		currentWeek.value = 1;
-		actualCurrentWeek.value = 1;
-	} else {
-		// 初始化当前周
-		actualCurrentWeek.value = calculateCurrentWeek();
-		currentWeek.value = actualCurrentWeek.value;
-	}
+	// 周数完全依赖后端 current_week，本地仅作极端兜底
+	currentWeek.value = 1;
+	actualCurrentWeek.value = 1;
 	updateWeekDays();
 
 	// 冷启动优先使用上次学期 + 本地课程缓存，避免空白等待
