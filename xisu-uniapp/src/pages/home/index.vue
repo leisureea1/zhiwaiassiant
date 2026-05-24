@@ -459,7 +459,7 @@ const loadSemesters = async () => {
 	const cached = getSemestersCache();
 	if (cached && cached.list.length > 0) {
 		semesters.value = cached.list;
-		currentSemesterId.value = cached.currentId;
+		currentSemesterId.value = cached.list.find(s => s.current)?.id || cached.currentId;
 		debugLog('[Home] Loaded semesters from cache:', semesters.value.length);
 		// 后台静默更新
 		fetchSemestersFromServer();

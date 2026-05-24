@@ -67,15 +67,6 @@ func (s *JwxtDirectService) GetSemester(sess *CachedJWXTSession) (map[string]any
 		}
 	}
 
-	if current == "" {
-		current = s.getCurrentSemesterID(client)
-		for _, sem := range options {
-			if sem["id"] == current {
-				sem["current"] = true
-			}
-		}
-	}
-
 	return map[string]any{
 		"success":             true,
 		"current_semester_id": current,

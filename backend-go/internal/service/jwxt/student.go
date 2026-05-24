@@ -96,20 +96,37 @@ func (s *JwxtDirectService) getStudentID(client *http.Client) string {
 }
 
 func (s *JwxtDirectService) getCurrentSemesterID(client *http.Client) string {
+	currentName := s.getCurrentSemesterName(client)
+	if strings.TrimSpace(currentName) != "" {
+		form := url.Values{}
+		form.Set("dataType", "semester")
+		if text, err := s.postForm(client, jwxtBaseURL+"/eams/dataQuery.action", form); err == nil {
+			if id := findSemesterIDByName(extractSemesterOptions(text), currentName); id != "" {
+				return id
+			}
+		}
+
+		urls := []string{
+			jwxtBaseURL + "/eams/courseTableForStd.action",
+			jwxtBaseURL + "/eams/home.action",
+			jwxtBaseURL + "/eams/teach/grade/course/person!search.action",
+		}
+		for _, u := range urls {
+			text, err := s.get(client, u)
+			if err != nil {
+				continue
+			}
+			if id := findSemesterIDByName(extractSemesterOptions(text), currentName); id != "" {
+				return id
+			}
+		}
+	}
+
 	if ck := getCookieValue(client, jwxtHomeURL, "semester.id"); strings.TrimSpace(ck) != "" {
 		return strings.TrimSpace(ck)
 	}
 	if ck := getCookieValue(client, jwxtBaseURL+"/eams/courseTableForStd.action", "semester.id"); strings.TrimSpace(ck) != "" {
 		return strings.TrimSpace(ck)
-	}
-
-	// 优先通过 dataQuery 学期下拉解析，避免页面脚本中的无关数字误匹配。
-	form := url.Values{}
-	form.Set("dataType", "semester")
-	if text, err := s.postForm(client, jwxtBaseURL+"/eams/dataQuery.action", form); err == nil {
-		if id := pickSemesterID(extractSemesterOptions(text)); id != "" {
-			return id
-		}
 	}
 
 	urls := []string{
@@ -128,9 +145,6 @@ func (s *JwxtDirectService) getCurrentSemesterID(client *http.Client) string {
 		if err != nil {
 			continue
 		}
-		if id := pickSemesterID(extractSemesterOptions(text)); id != "" {
-			return id
-		}
 		for _, p := range patterns {
 			r := regexp.MustCompile(`(?is)` + p)
 			m := r.FindStringSubmatch(text)
@@ -139,17 +153,37 @@ func (s *JwxtDirectService) getCurrentSemesterID(client *http.Client) string {
 			}
 		}
 	}
+
+	return ""
+}
+
+func findSemesterIDByName(options []map[string]any, currentName string) string {
+	normalizedCurrent := normalizeSemesterText(currentName)
+	if strings.TrimSpace(normalizedCurrent) == "" {
+		return ""
+	}
+
+	for _, sem := range options {
+		name, _ := sem["name"].(string)
+		if normalizeSemesterText(name) != normalizedCurrent {
+			continue
+		}
+		if id, ok := sem["id"].(string); ok {
+			return strings.TrimSpace(id)
+		}
+	}
+
 	return ""
 }
 
 func mergeUserDetail(info map[string]any, html string) {
 	labels := map[string]string{
-		"姓名":      "name",
-		"学号":      "student_code",
-		"院系":      "department",
-		"专业":      "major",
-		"所属班级":    "class_name",
-		"年级":      "grade",
+		"姓名":   "name",
+		"学号":   "student_code",
+		"院系":   "department",
+		"专业":   "major",
+		"所属班级": "class_name",
+		"年级":   "grade",
 	}
 	tableRe := regexp.MustCompile(`(?is)<table[^>]*>.*?</table>`)
 	rows := regexp.MustCompile(`(?is)<tr[^>]*>(.*?)</tr>`).FindAllStringSubmatch(html, -1)

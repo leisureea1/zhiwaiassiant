@@ -62,7 +62,7 @@ func (s *JwxtDirectService) getLatestSemesterID(client *http.Client) string {
 	form := url.Values{}
 	form.Set("dataType", "semester")
 	if body, err := s.postForm(client, jwxtBaseURL+"/eams/dataQuery.action", form); err == nil {
-		if id := pickSemesterID(extractSemesterOptions(body)); id != "" {
+		if id := pickLatestSemesterID(extractSemesterOptions(body)); id != "" {
 			return id
 		}
 	}
@@ -74,7 +74,7 @@ func (s *JwxtDirectService) getLatestSemesterID(client *http.Client) string {
 	}
 	for _, raw := range fallbackURLs {
 		if page, err := s.get(client, raw); err == nil {
-			if id := pickSemesterID(extractSemesterOptions(page)); id != "" {
+			if id := pickLatestSemesterID(extractSemesterOptions(page)); id != "" {
 				return id
 			}
 		}
@@ -83,17 +83,9 @@ func (s *JwxtDirectService) getLatestSemesterID(client *http.Client) string {
 	return ""
 }
 
-func pickSemesterID(options []map[string]any) string {
+func pickLatestSemesterID(options []map[string]any) string {
 	if len(options) == 0 {
 		return ""
-	}
-
-	for _, sem := range options {
-		if current, ok := sem["current"].(bool); ok && current {
-			if id, ok := sem["id"].(string); ok {
-				return strings.TrimSpace(id)
-			}
-		}
 	}
 
 	bestID := ""
@@ -187,11 +179,11 @@ func shouldSkipCourseName(name string) bool {
 
 	// 过滤教务页面表头/占位文案，避免被误识别为课程
 	invalid := map[string]struct{}{
-		"课程名称":     {},
-		"课程名称课程代码": {},
-		"课程名":      {},
-		"课程":        {},
-		"course":    {},
+		"课程名称":       {},
+		"课程名称课程代码":   {},
+		"课程名":        {},
+		"课程":         {},
+		"course":     {},
 		"coursename": {},
 	}
 	if _, ok := invalid[normalized]; ok {
