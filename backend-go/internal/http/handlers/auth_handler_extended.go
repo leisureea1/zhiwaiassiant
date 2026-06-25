@@ -5,6 +5,7 @@ import (
 	crand "crypto/rand"
 	"errors"
 	"fmt"
+	"log"
 	"math/big"
 	"net/http"
 	"os"
@@ -291,6 +292,7 @@ func (h *ExtendedAuthHandler) SendVerificationCode(c *gin.Context) {
 	// 发送邮件（仅未注册的邮箱才实际发送）
 	if !emailAlreadyRegistered {
 		if err := h.mailSvc.SendVerificationCode(req.Email, code); err != nil {
+			log.Printf("[SendCode] failed to send email to %s: %v", req.Email, err)
 			if isMailServiceUnavailable(err) {
 				response.Error(c, http.StatusServiceUnavailable, "邮件服务未配置或暂时不可用")
 				return
@@ -298,6 +300,9 @@ func (h *ExtendedAuthHandler) SendVerificationCode(c *gin.Context) {
 			response.Error(c, http.StatusInternalServerError, "验证码发送失败，请稍后再试")
 			return
 		}
+		log.Printf("[SendCode] verification code sent to %s", req.Email)
+	} else {
+		log.Printf("[SendCode] email %s already registered, skip sending", req.Email)
 	}
 
 	if strings.ToLower(os.Getenv("APP_ENV")) != "production" {
@@ -608,6 +613,7 @@ func (h *ExtendedAuthHandler) ForgotPassword(c *gin.Context) {
 
 	// 发送邮件
 	if err := h.mailSvc.SendPasswordReset(req.Email, code); err != nil {
+		log.Printf("[ResetPwd] failed to send email to %s: %v", req.Email, err)
 		if isMailServiceUnavailable(err) {
 			response.Error(c, http.StatusServiceUnavailable, "邮件服务未配置或暂时不可用")
 			return
@@ -716,7 +722,13 @@ func isMailServiceUnavailable(err error) bool {
 		return false
 	}
 	msg := strings.ToLower(err.Error())
-	return strings.Contains(msg, "smtp") || strings.Contains(msg, "connection")
+	return strings.Contains(msg, "smtp") ||
+		strings.Contains(msg, "connection") ||
+		strings.Contains(msg, "auth") ||
+		strings.Contains(msg, "credentials") ||
+		strings.Contains(msg, "tls") ||
+		strings.Contains(msg, "mail from") ||
+		strings.Contains(msg, "rcpt")
 }
 
 func mapValueStringPtr(m map[string]any, key string) *string {

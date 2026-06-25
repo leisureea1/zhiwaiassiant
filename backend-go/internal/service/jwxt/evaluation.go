@@ -3,6 +3,7 @@ package jwxt
 import (
 	"encoding/json"
 	"fmt"
+	"html"
 	"net/url"
 	"regexp"
 	"strconv"
@@ -114,30 +115,53 @@ func (s *JwxtDirectService) AutoEvaluation(sess *CachedJWXTSession) (map[string]
 	}, nil
 }
 
-func parseEvaluationPending(html string) []map[string]any {
+func parseEvaluationPending(htmlStr string) []map[string]any {
 	out := make([]map[string]any, 0)
-	r := regexp.MustCompile(`(?is)<a[^>]*href="([^"]*stdEvaluate!answer\.action[^"]*)"[^>]*>(.*?)</a>`)
-	matches := r.FindAllStringSubmatch(html, -1)
-	for _, m := range matches {
-		if len(m) < 3 {
+
+	// 按 </tr> 分割，找到包含 evalLesson 的行
+	chunks := strings.Split(htmlStr, "</tr>")
+	lessonRe := regexp.MustCompile(`evaluationLesson\.id=(\d+)`)
+	tdRe := regexp.MustCompile(`(?is)<td[^>]*>(.*?)</td>`)
+
+	for _, chunk := range chunks {
+		m := lessonRe.FindStringSubmatch(chunk)
+		if len(m) < 2 {
 			continue
 		}
-		href := m[1]
-		lesson := regexp.MustCompile(`evaluationLesson\.id=(\d+)`).FindStringSubmatch(href)
-		if len(lesson) < 2 {
+		lessonID := m[1]
+
+		tds := tdRe.FindAllStringSubmatch(chunk, -1)
+		if len(tds) < 4 {
 			continue
 		}
-		item := map[string]any{"lesson_id": lesson[1], "teacher_name": "未知教师", "course_code": "", "course_name": "", "course_type": ""}
-		teacher := regexp.MustCompile(`(?is)<span[^>]*class="eval"[^>]*>(.*?)</span>`).FindStringSubmatch(m[2])
-		if len(teacher) > 1 {
-			t := stripTags(teacher[1])
-			t = strings.ReplaceAll(t, "(进行评教)", "")
-			item["teacher_name"] = strings.TrimSpace(t)
-		}
-		out = append(out, item)
+
+		out = append(out, map[string]any{
+			"lesson_id":    lessonID,
+			"course_code":  cleanTableCell(tds[0][1]),
+			"course_name":  cleanTableCell(tds[1][1]),
+			"course_type":  cleanTableCell(tds[2][1]),
+			"teacher_name": cleanTableCell(tds[3][1]),
+		})
 	}
 	return out
 }
+
+func cleanTableCell(raw string) string {
+	s := html.UnescapeString(stripTags(raw))
+	s = strings.NewReplacer(
+		"\u00a0", " ",
+		"\r", " ",
+		"\n", " ",
+		"\t", " ",
+		",", " ",
+	).Replace(s)
+	// 移除 "(进行评教)"
+	s = strings.ReplaceAll(s, "(进行评教)", "")
+	s = multiSpaceRe.ReplaceAllString(s, " ")
+	return strings.TrimSpace(s)
+}
+
+var multiSpaceRe = regexp.MustCompile(`\s{2,}`)
 
 func buildEvaluationSubmitPayload(questionPage string, lessonID string) map[string]string {
 	p := map[string]string{
