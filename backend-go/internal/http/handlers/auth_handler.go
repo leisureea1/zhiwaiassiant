@@ -236,7 +236,11 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 			IPAddress: &ip,
 			ExpiresAt: refreshExpiresAt,
 		}
-		return tx.Create(&newRow).Error
+		if err := tx.Create(&newRow).Error; err != nil {
+			return err
+		}
+		// refresh 时也更新最后活跃时间
+		return tx.Model(&database.User{}).Where("id = ?", user.ID).Update("last_login_at", time.Now()).Error
 	}); err != nil {
 		response.Error(c, http.StatusInternalServerError, "failed to rotate refresh token")
 		return

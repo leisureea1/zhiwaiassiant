@@ -22,11 +22,20 @@ func SystemLogger(db *gorm.DB) gin.HandlerFunc {
 		}
 
 		status := c.Writer.Status()
+		method := c.Request.Method
+		path := c.Request.URL.RequestURI()
+
+		// 只记录以下操作，大幅减少 VIEW 日志量：
+		// 1. 写操作 (POST/PUT/PATCH/DELETE)
+		// 2. 错误 (4xx/5xx)
+		// 3. 认证相关 (login/register/refresh)
+		if method == "GET" && status < 400 && !strings.Contains(path, "/auth/") {
+			return
+		}
+
 		durationMs := int(time.Since(start).Milliseconds())
 		ip := c.ClientIP()
 		userAgent := c.Request.UserAgent()
-		path := c.Request.URL.RequestURI()
-		method := c.Request.Method
 		message := fmt.Sprintf("%s %s %d", method, path, status)
 
 		level := inferLogLevel(status)

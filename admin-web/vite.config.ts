@@ -1,35 +1,22 @@
 import { defineConfig } from 'vite'
-import vue from '@vitejs/plugin-vue'
-import AutoImport from 'unplugin-auto-import/vite'
-import Components from 'unplugin-vue-components/vite'
-import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
-import { resolve } from 'path'
+import react from '@vitejs/plugin-react'
 
 export default defineConfig({
-  plugins: [
-    vue(),
-    AutoImport({
-      resolvers: [ElementPlusResolver()],
-      imports: ['vue', 'vue-router', 'pinia'],
-      dts: 'src/auto-imports.d.ts',
-    }),
-    Components({
-      resolvers: [ElementPlusResolver()],
-      dts: 'src/components.d.ts',
-    }),
-  ],
-  resolve: {
-    alias: {
-      '@': resolve(__dirname, 'src'),
-    },
-  },
+  plugins: [react()],
   server: {
-    port: 3100,
+    port: 5173,
     proxy: {
-      '/api/v1': {
-        target: 'http://localhost:3000',
+      '/api': {
+        target: 'http://localhost:3300',
         changeOrigin: true,
       },
     },
   },
+  build: {
+    outDir: 'dist',
+    sourcemap: false,
+  },
+  // 开发模式下 VITE_API_BASE 设为 /api/v1 走代理
+  // 生产构建时 .env.production 指向真实后端 https://api.xisu.leisureea.cn/api/v1
 })
+
