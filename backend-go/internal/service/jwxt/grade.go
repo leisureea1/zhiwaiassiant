@@ -31,6 +31,9 @@ func (s *JwxtDirectService) GetGrade(sess *CachedJWXTSession, semesterID string)
 	if strings.Contains(body, "用户名") && strings.Contains(body, "密码") {
 		return map[string]any{"success": false, "error": "需要重新登录", "grades": []any{}}, nil
 	}
+	if strings.Contains(body, "请不要过快点击") {
+		return nil, fmt.Errorf("jwxt rate limited: 请不要过快点击")
+	}
 
 	grades := parseHTMLTableRows(body)
 	grades = sanitizeGrades(grades)

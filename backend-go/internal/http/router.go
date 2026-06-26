@@ -130,6 +130,9 @@ func NewRouter(cfg *config.Config, db *gorm.DB, redisClient *redis.Client) *gin.
 			admin.POST("/email/broadcast", adminHandler.SendBulkEmail)
 			}
 
+			// DEBUG: 手动触发成绩检查（无需 admin，方便调试）
+			protected.POST("/grade-subscription/trigger", gradeSubHandler.TriggerCheck)
+
 			superAdmin := protected.Group("/admin")
 			superAdmin.Use(middleware.RequireRole("SUPER_ADMIN"))
 			{

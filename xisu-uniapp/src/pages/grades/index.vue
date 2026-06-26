@@ -285,6 +285,7 @@ const loadGrades = async () => {
 	}
 	
 	isLoading.value = true;
+	isLoadingGrades.value = true;
 	try {
 		const res = await jwxtApi.getGrades(currentSemesterId.value);
 		debugLog('[Grades] Response:', JSON.stringify(res));
@@ -307,12 +308,16 @@ const loadGrades = async () => {
 		emptyMessage.value = error instanceof Error ? error.message : '网络错误，请稍后重试';
 	} finally {
 		isLoading.value = false;
+		isLoadingGrades.value = false;
 	}
 };
 
 // 选择学期
+const isLoadingGrades = ref(false);
+
 const selectSemester = (semesterId: string) => {
 	if (currentSemesterId.value === semesterId) return;
+	if (isLoadingGrades.value) return; // 防抖：上一个请求未完成时不发起新请求
 	currentSemesterId.value = semesterId;
 	loadGrades();
 };

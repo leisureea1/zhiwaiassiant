@@ -16,9 +16,11 @@ import (
 )
 
 const (
-	maxConcurrentChecks = 3
+	maxConcurrentChecks = 1                      // 教务系统限流，串行请求
+	userInterval        = 3 * time.Second        // 用户间间隔
+	rateLimitCooldown   = 10 * time.Second       // 被限流后的冷却
 	maxRetries          = 2
-	retryDelay          = 5 * time.Second
+	retryDelay          = 10 * time.Second
 )
 
 type GradeSubscriptionService struct {
@@ -75,6 +77,11 @@ func (s *GradeSubscriptionService) runOnce() {
 	for i := range subscriptions {
 		wg.Add(1)
 		sem <- struct{}{} // acquire
+
+		// 教务系统限流：用户间至少间隔 userInterval
+		if i > 0 {
+			time.Sleep(userInterval)
+		}
 
 		go func(sub *database.GradeSubscription) {
 			defer wg.Done()
@@ -190,7 +197,23 @@ func (s *GradeSubscriptionService) checkUserGrades(ctx context.Context, sub *dat
 	// Get grades
 	gradeData, err := s.jwxtSvc.GetGrade(sess, currentSemesterID)
 	if err != nil {
-		return fmt.Errorf("failed to get grades: %w", err)
+		// 教务系统限流：强制重新登录换 session
+		if strings.Contains(err.Error(), "rate limited") {
+			log.Printf("[GradeSubscription] User %s: rate limited, re-logging in...", sub.UserID)
+			time.Sleep(rateLimitCooldown)
+			newSess, loginErr := s.jwxtSvc.Login(*user.JWXTUsername, *user.JWXTPassword)
+			if loginErr != nil {
+				return fmt.Errorf("re-login after rate limit failed: %w", loginErr)
+			}
+			newSess.ValidatedAt = time.Now().UnixMilli()
+			_ = s.jwxtSvc.SaveSession(ctx, sub.UserID, newSess, 50*time.Minute)
+			gradeData, err = s.jwxtSvc.GetGrade(newSess, currentSemesterID)
+			if err != nil {
+				return fmt.Errorf("failed to get grades after re-login: %w", err)
+			}
+		} else {
+			return fmt.Errorf("failed to get grades: %w", err)
+		}
 	}
 
 	gradesRaw, ok := gradeData["grades"]
@@ -360,4 +383,14 @@ func parseFloatStr(s string) float64 {
 		return -1
 	}
 	return f
+}
+
+func hashPrefix(h *string) string {
+	if h == nil {
+		return "<nil>"
+	}
+	if len(*h) < 12 {
+		return *h
+	}
+	return (*h)[:12]
 }

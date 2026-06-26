@@ -111,11 +111,29 @@ func (h *JWXTHandler) Grade(c *gin.Context) {
 		response.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	data, err := h.service.GetGrade(sess, c.Query("semester_id"))
-	if err != nil {
+
+	semesterID := c.Query("semester_id")
+
+	var data map[string]any
+	for attempt := 0; attempt < 3; attempt++ {
+		if attempt > 0 {
+			time.Sleep(3 * time.Second)
+		}
+		data, err = h.service.GetGrade(sess, semesterID)
+		if err == nil {
+			break
+		}
+		if strings.Contains(err.Error(), "rate limited") {
+			continue // 教务限流，等待后重试
+		}
 		response.Error(c, http.StatusBadGateway, err.Error())
 		return
 	}
+	if err != nil {
+		response.Error(c, http.StatusTooManyRequests, "教务系统繁忙，请稍后再试")
+		return
+	}
+
 	_ = h.service.SaveSession(context.Background(), userID, sess, jwxtSessionTTL)
 	respondNestSuccess(c, toLegacyJwxtEnvelope(data))
 }
