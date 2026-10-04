@@ -59,16 +59,25 @@ func (h *JWXTHandler) CourseRefresh(c *gin.Context) {
 		return
 	}
 
-	h.service.ClearSession(context.Background(), userID)
 	sess, err := h.getOrCreateSession(c.Request.Context(), userID)
 	if err != nil {
 		response.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
 	data, err := h.service.GetCourse(sess, c.Query("semester_id"), "")
-	if err != nil {
-		response.Error(c, http.StatusBadGateway, err.Error())
-		return
+	if err != nil || (data != nil && data["success"] == false) {
+		// 会话可能已在教务端失效，清空后重新登录重试一次
+		h.service.ClearSession(context.Background(), userID)
+		sess, err = h.getOrCreateSession(c.Request.Context(), userID)
+		if err != nil {
+			response.Error(c, http.StatusBadRequest, err.Error())
+			return
+		}
+		data, err = h.service.GetCourse(sess, c.Query("semester_id"), "")
+		if err != nil {
+			response.Error(c, http.StatusBadGateway, err.Error())
+			return
+		}
 	}
 	_ = h.service.SaveSession(context.Background(), userID, sess, jwxtSessionTTL)
 	respondNestSuccess(c, toLegacyJwxtEnvelope(data))

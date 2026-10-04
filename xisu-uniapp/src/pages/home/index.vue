@@ -208,28 +208,28 @@ const getCoursesCache = (semesterId: string): DisplayCourse[] | null => {
 };
 
 // 保存学期缓存
-const saveSemestersCache = (semesterList: SemesterInfo[], currentId: string) => {
+const saveSemestersCache = (semesterList: SemesterInfo[], currentId: string, currentWeekNum?: number) => {
 	try {
-		const cacheData: CacheData<{ list: SemesterInfo[]; currentId: string }> = {
-			data: { list: semesterList, currentId },
+		const cacheData: CacheData<{ list: SemesterInfo[]; currentId: string; currentWeek?: number }> = {
+			data: { list: semesterList, currentId, currentWeek: currentWeekNum },
 			timestamp: Date.now(),
 		};
 		uni.setStorageSync(SEMESTERS_CACHE_KEY, JSON.stringify(cacheData));
 		if (currentId) {
 			uni.setStorageSync(LAST_SEMESTER_ID_KEY, currentId);
 		}
-		debugLog('[Cache] Semesters saved, count:', semesterList.length);
+		debugLog('[Cache] Semesters saved, count:', semesterList.length, 'week:', currentWeekNum);
 	} catch (e) {
 		debugError('[Cache] Failed to save semesters:', e);
 	}
 };
 
 // 获取学期缓存
-const getSemestersCache = (): { list: SemesterInfo[]; currentId: string } | null => {
+const getSemestersCache = (): { list: SemesterInfo[]; currentId: string; currentWeek?: number } | null => {
 	try {
 		const cached = uni.getStorageSync(SEMESTERS_CACHE_KEY);
 		if (cached) {
-			const cacheData: CacheData<{ list: SemesterInfo[]; currentId: string }> = JSON.parse(cached);
+			const cacheData: CacheData<{ list: SemesterInfo[]; currentId: string; currentWeek?: number }> = JSON.parse(cached);
 			// 学期数据缓存有效期更长（7天）
 			if (Date.now() - cacheData.timestamp < 7 * 24 * 60 * 60 * 1000) {
 				debugLog('[Cache] Semesters loaded from cache');
@@ -262,28 +262,65 @@ const clearCoursesCache = (semesterId?: string) => {
 	}
 };
 
-// 根据学期名称解析学期开始日期
+// 根据学期名称解析学期开始周周一（00:00:00）
 const parseSemesterStartDate = (semesterName: string): Date | null => {
-	// 学期名称格式: "2025-2026学年第一学期" 或 "2025-2026学年第二学期"
-	const match = semesterName.match(/(\d{4})-(\d{4})学年第([一二])学期/);
+	// 学期名称格式: "2026-2027学年第一学期"、"2026-2027学年秋季学期" 等
+	const match = semesterName.match(/(\d{4})\s*[-–—~～]\s*(\d{4})\s*(?:学年|学年度|年度)?\s*(?:第)?\s*([123一二三两秋春夏])\s*(?:学期)?/);
 	if (match) {
 		const startYear = parseInt(match[1]);
 		const semester = match[3];
 		
-		if (semester === '一') {
-			// 秋季学期（第一学期）：从第一年的9月1日开始
-			return new Date(startYear, 8, 1);
+		let targetDate: Date;
+		if (semester === '一' || semester === '1' || semester === '秋') {
+			// 秋季学期（第一学期）：9月1日所在周的周一
+			targetDate = new Date(startYear, 8, 1);
+		} else if (semester === '二' || semester === '2' || semester === '两' || semester === '春') {
+			// 春季学期（第二学期）：次年3月1日所在周的周一
+			targetDate = new Date(startYear + 1, 2, 1);
 		} else {
-			// 春季学期（第二学期）：从第二年的3月2日开始
-			return new Date(startYear + 1, 2, 2);
+			// 夏季/短学期（第三学期）：次年7月1日所在周的周一
+			targetDate = new Date(startYear + 1, 6, 1);
 		}
+		
+		const dayOfWeek = targetDate.getDay() || 7;
+		targetDate.setDate(targetDate.getDate() - dayOfWeek + 1);
+		targetDate.setHours(0, 0, 0, 0);
+		return targetDate;
 	}
 	return null;
 };
 
+// 根据学期名称和当前时间推算教学周数
+const inferWeekFromSemesterName = (semesterName: string, now: Date = new Date()): number => {
+	const startDate = parseSemesterStartDate(semesterName);
+	if (!startDate) return 1;
+	
+	const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+	if (today.getTime() < startDate.getTime()) {
+		return 1;
+	}
+	
+	const diffMs = today.getTime() - startDate.getTime();
+	const diffDays = Math.floor(diffMs / (24 * 60 * 60 * 1000));
+	const week = Math.floor(diffDays / 7) + 1;
+	
+	if (week >= 1 && week <= 25) {
+		return week;
+	}
+	return 1;
+};
+
+// 推算当前选中学期的实际教学周
+const inferCurrentWeek = (): number => {
+	const semester = semesters.value.find(s => s.id === currentSemesterId.value) || semesters.value[0];
+	if (semester?.name) {
+		return inferWeekFromSemesterName(semester.name);
+	}
+	return 1;
+};
+
 // 获取当前选中学期的开始日期
 const getSelectedSemesterStart = (): Date => {
-	// 先尝试根据选中的学期名称解析
 	const semester = semesters.value.find(s => s.id === currentSemesterId.value);
 	if (semester) {
 		const parsedDate = parseSemesterStartDate(semester.name);
@@ -291,9 +328,7 @@ const getSelectedSemesterStart = (): Date => {
 			return parsedDate;
 		}
 	}
-	
-	// 兜底：根据当前日期推断
-	return new Date(); // 周数完全依赖后端 current_week
+	return new Date();
 };
 
 // 获取假期祝福语
@@ -427,7 +462,20 @@ const loadSemesters = async () => {
 	if (cached && cached.list.length > 0) {
 		semesters.value = cached.list;
 		currentSemesterId.value = cached.list.find(s => s.current)?.id || cached.currentId;
-		debugLog('[Home] Loaded semesters from cache:', semesters.value.length);
+		
+		// 恢复周数：优先使用缓存周数或日期推算
+		if (cached.currentWeek && cached.currentWeek > 0) {
+			actualCurrentWeek.value = cached.currentWeek;
+			currentWeek.value = cached.currentWeek;
+		} else {
+			const inferred = inferCurrentWeek();
+			actualCurrentWeek.value = inferred;
+			currentWeek.value = inferred;
+		}
+		isVacation.value = false;
+		updateWeekDays();
+		
+		debugLog('[Home] Loaded semesters from cache:', semesters.value.length, 'week:', actualCurrentWeek.value);
 		// 后台静默更新
 		fetchSemestersFromServer();
 		return;
@@ -464,20 +512,47 @@ const fetchSemestersFromServer = async () => {
 				currentSemesterId.value = semesters.value[0].id;
 			}
 
-			// 使用后端返回的教学周数
+			// 使用后端返回的教学周数或本地校历日期推算
 			if (typeof semesterPayload.current_week === 'number' && semesterPayload.current_week > 0) {
 				actualCurrentWeek.value = semesterPayload.current_week;
 				currentWeek.value = actualCurrentWeek.value;
 				isVacation.value = false;
 				updateWeekDays();
+			} else {
+				const inferred = inferCurrentWeek();
+				if (inferred > 0) {
+					actualCurrentWeek.value = inferred;
+					currentWeek.value = inferred;
+					isVacation.value = false;
+					updateWeekDays();
+				}
 			}
 
-			// 保存到缓存
-			saveSemestersCache(semesters.value, currentSemesterId.value);
+			// 保存到缓存（带上周数）
+			saveSemestersCache(semesters.value, currentSemesterId.value, actualCurrentWeek.value);
 			debugLog('[Home] Loaded semesters:', semesters.value.length, 'current:', currentSemesterId.value, 'week:', actualCurrentWeek.value);
+		} else {
+			// 兜底周数推算
+			if (actualCurrentWeek.value === 1) {
+				const inferred = inferCurrentWeek();
+				if (inferred > 0) {
+					actualCurrentWeek.value = inferred;
+					currentWeek.value = inferred;
+					updateWeekDays();
+				}
+			}
 		}
 	} catch (error) {
 		debugError('[Home] Failed to load semesters:', error);
+		// 接口异常时（如401或网络错误），推算保底
+		if (actualCurrentWeek.value === 1) {
+			const inferred = inferCurrentWeek();
+			if (inferred > 0) {
+				actualCurrentWeek.value = inferred;
+				currentWeek.value = inferred;
+				updateWeekDays();
+			}
+		}
 	}
 };
 
@@ -636,47 +711,64 @@ const transformCourses = (apiCourses: Array<{
 	}));
 };
 
+// 请求防重变量
+let coursesInFlight: Promise<boolean> | null = null;
+let coursesInFlightSemester = '';
+
 // 从后端获取课程数据
 const fetchCoursesFromServer = async (semesterId: string, showError = true): Promise<boolean> => {
-	try {
-		const res = await jwxtApi.getCourses(semesterId === 'default' ? undefined : semesterId);
-		debugLog('[Home] Courses response:', JSON.stringify(res));
-		
-		if (res.success && res.data?.courses) {
-			allCourses.value = transformCourses(res.data.courses);
-			// 保存到缓存
-			saveCoursesCache(semesterId, allCourses.value);
-			debugLog('[Home] Loaded courses from server:', allCourses.value.length);
-			return true;
-		} else if (res.error && showError) {
-			debugError('[Home] Failed to load courses:', res.error);
-			uni.showToast({ title: res.error, icon: 'none' });
-		}
-		return false;
-	} catch (error) {
-		debugError('[Home] Error loading courses:', error);
-		const errorMsg = error instanceof Error ? error.message : '加载课程表失败';
-		
-		if (showError) {
-			// 检测是否是教务系统未绑定的错误
-			if (errorMsg.includes('绑定') || errorMsg.includes('教务')) {
-				uni.showModal({
-					title: '提示',
-					content: '您需要先绑定教务系统账号才能查看课程表，是否现在去绑定？',
-					confirmText: '去绑定',
-					cancelText: '稍后',
-					success: (result) => {
-						if (result.confirm) {
-							uni.navigateTo({ url: '/pages/profile/bind-jwxt' });
-						}
-					}
-				});
-			} else {
-				uni.showToast({ title: errorMsg, icon: 'none' });
-			}
-		}
-		return false;
+	if (coursesInFlight && coursesInFlightSemester === semesterId) {
+		debugLog('[Home] Reusing in-flight courses request for semester:', semesterId);
+		return coursesInFlight;
 	}
+
+	coursesInFlightSemester = semesterId;
+	coursesInFlight = (async () => {
+		try {
+			const res = await jwxtApi.getCourses(semesterId === 'default' ? undefined : semesterId);
+			debugLog('[Home] Courses response:', JSON.stringify(res));
+			
+			if (res.success && res.data?.courses) {
+				allCourses.value = transformCourses(res.data.courses);
+				// 保存到缓存
+				saveCoursesCache(semesterId, allCourses.value);
+				debugLog('[Home] Loaded courses from server:', allCourses.value.length);
+				return true;
+			} else if (res.error && showError) {
+				debugError('[Home] Failed to load courses:', res.error);
+				uni.showToast({ title: res.error, icon: 'none' });
+			}
+			return false;
+		} catch (error) {
+			debugError('[Home] Error loading courses:', error);
+			const errorMsg = error instanceof Error ? error.message : '加载课程表失败';
+			
+			if (showError) {
+				// 检测是否是教务系统未绑定的错误
+				if (errorMsg.includes('绑定') || errorMsg.includes('教务')) {
+					uni.showModal({
+						title: '提示',
+						content: '您需要先绑定教务系统账号才能查看课程表，是否现在去绑定？',
+						confirmText: '去绑定',
+						cancelText: '稍后',
+						success: (result) => {
+							if (result.confirm) {
+								uni.navigateTo({ url: '/pages/profile/bind-jwxt' });
+							}
+						}
+					});
+				} else {
+					uni.showToast({ title: errorMsg, icon: 'none' });
+				}
+			}
+			return false;
+		} finally {
+			coursesInFlight = null;
+			coursesInFlightSemester = '';
+		}
+	})();
+
+	return coursesInFlight;
 };
 
 // 从后端加载课程表：先显示缓存，同时异步更新
@@ -961,9 +1053,22 @@ onMounted(async () => {
 		headerRightPadding.value = '0px';
 	}
 	
-	// 周数完全依赖后端 current_week，本地仅作极端兜底
-	currentWeek.value = 1;
-	actualCurrentWeek.value = 1;
+	// 初始化周数：优先从本地学期缓存恢复，或根据学期校历推算真实周数，避免写死为第1周
+	const cachedSem = getSemestersCache();
+	if (cachedSem?.currentWeek && cachedSem.currentWeek > 0) {
+		currentWeek.value = cachedSem.currentWeek;
+		actualCurrentWeek.value = cachedSem.currentWeek;
+	} else if (cachedSem?.list?.length) {
+		const cur = cachedSem.list.find(s => s.current) || cachedSem.list[0];
+		if (cur?.name) {
+			const inferred = inferWeekFromSemesterName(cur.name);
+			currentWeek.value = inferred;
+			actualCurrentWeek.value = inferred;
+		}
+	} else {
+		currentWeek.value = 1;
+		actualCurrentWeek.value = 1;
+	}
 	updateWeekDays();
 
 	// 冷启动优先使用上次学期 + 本地课程缓存，避免空白等待
@@ -977,12 +1082,13 @@ onMounted(async () => {
 	}
 
 	const startupSemesterId = currentSemesterId.value;
-	loadCourses();
+	// 1. 先加载课表（有本地缓存可瞬间呈现）
+	await loadCourses();
 	
-	// 再同步学期并按最新学期校正课表
+	// 2. 再同步学期信息并校准周数与学期
 	await loadSemesters();
-	if (currentSemesterId.value !== startupSemesterId || allCourses.value.length === 0) {
-		loadCourses();
+	if (currentSemesterId.value && currentSemesterId.value !== startupSemesterId) {
+		await loadCourses(true);
 	}
 
 	// 加载弹窗公告

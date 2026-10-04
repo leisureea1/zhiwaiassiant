@@ -44,7 +44,7 @@ func (s *JwxtDirectService) GetSemester(sess *CachedJWXTSession) (map[string]any
 				"semesters":           []map[string]any{{"id": current, "name": current, "current": true}},
 			}, nil
 		}
-		return map[string]any{"success": false, "error": "获取学期失败", "semesters": []any{}}, nil
+		return map[string]any{"success": false, "error": "获取学期失败", "semesters": []map[string]any{}}, fmt.Errorf("failed to fetch semesters from jwxt: no semester options found")
 	}
 
 	// 与旧 Nest/Python 行为保持一致：按抓取顺序反转，最新学期在前
@@ -73,6 +73,70 @@ func (s *JwxtDirectService) GetSemester(sess *CachedJWXTSession) (map[string]any
 				"current": true,
 			}}, options...)
 		}
+	}
+
+	// Fallback 1: check if any option had `selected` in HTML
+	if current == "" {
+		for _, sem := range options {
+			if sel, ok := sem["selected"].(bool); ok && sel {
+				sem["current"] = true
+				current = fmt.Sprintf("%v", sem["id"])
+				break
+			}
+		}
+	}
+
+	// Fallback 2: try getCurrentSemesterID (cookies, scraping action pages)
+	if current == "" {
+		if curID := s.getCurrentSemesterID(client); strings.TrimSpace(curID) != "" {
+			current = strings.TrimSpace(curID)
+			found := false
+			for _, sem := range options {
+				if fmt.Sprintf("%v", sem["id"]) == current {
+					sem["current"] = true
+					found = true
+					break
+				}
+			}
+			if !found {
+				options = append([]map[string]any{{
+					"id":      current,
+					"name":    current,
+					"current": true,
+				}}, options...)
+			}
+		}
+	}
+
+	// Fallback 3: fallback to latest semester in options
+	if current == "" && len(options) > 0 {
+		options[0]["current"] = true
+		current = fmt.Sprintf("%v", options[0]["id"])
+	}
+
+	// Fallback current_week if not extracted from HTML
+	if currentWeek <= 0 && currentName != "" {
+		currentWeek = inferCurrentWeekFromSemester(currentName, time.Now())
+	}
+	if currentWeek <= 0 {
+		for _, sem := range options {
+			if isCur, ok := sem["current"].(bool); ok && isCur {
+				if name, ok := sem["name"].(string); ok {
+					currentWeek = inferCurrentWeekFromSemester(name, time.Now())
+					if currentWeek > 0 {
+						break
+					}
+				}
+			}
+		}
+	}
+	if currentWeek <= 0 && len(options) > 0 {
+		if name, ok := options[0]["name"].(string); ok {
+			currentWeek = inferCurrentWeekFromSemester(name, time.Now())
+		}
+	}
+	if currentWeek <= 0 {
+		currentWeek = 1
 	}
 
 	return map[string]any{
@@ -125,6 +189,9 @@ func extractSemesterOptions(html string) []map[string]any {
 			continue
 		}
 		item := map[string]any{"id": strings.TrimSpace(id), "name": name}
+		if regexp.MustCompile(`(?i)\bselected\b`).MatchString(tag) {
+			item["selected"] = true
+		}
 		out = append(out, item)
 	}
 	return out
@@ -143,18 +210,69 @@ func (s *JwxtDirectService) getCurrentSemesterInfo(client *http.Client) (string,
 }
 
 func extractCurrentWeekFromHTML(body string) int {
-	// 匹配 "第13周"、"第13教学周"、"第 13 教学周" 等各种变体
-	re := regexp.MustCompile(`第\s*(\d+)\s*(?:教学)?周`)
-	if m := re.FindStringSubmatch(body); len(m) > 1 {
-		if n, err := strconv.Atoi(m[1]); err == nil {
-			return n
+	patterns := []string{
+		`第\s*(\d+)\s*(?:教学)?周`,
+		`(?:教学周|当前教学周|当前周|周次)[：:\s]+(?:第)?\s*(\d+)`,
+		`["']?(?:curWeek|currentWeek|teachWeek|weekNumber)["']?\s*[:=]\s*["']?(\d+)`,
+	}
+	for _, p := range patterns {
+		re := regexp.MustCompile(p)
+		if m := re.FindStringSubmatch(body); len(m) > 1 {
+			if n, err := strconv.Atoi(m[1]); err == nil && n > 0 && n <= 30 {
+				return n
+			}
 		}
 	}
+
 	text := html.UnescapeString(stripTags(body))
-	if m := re.FindStringSubmatch(text); len(m) > 1 {
-		if n, err := strconv.Atoi(m[1]); err == nil {
-			return n
+	for _, p := range patterns {
+		re := regexp.MustCompile(p)
+		if m := re.FindStringSubmatch(text); len(m) > 1 {
+			if n, err := strconv.Atoi(m[1]); err == nil && n > 0 && n <= 30 {
+				return n
+			}
 		}
+	}
+	return 0
+}
+
+func inferCurrentWeekFromSemester(semesterName string, now time.Time) int {
+	startYear, term, ok := parseNormalizedSemester(semesterName)
+	if !ok {
+		return 0
+	}
+	loc := time.FixedZone("CST", 8*3600) // 中国标准时间 UTC+8
+	nowCST := now.In(loc)
+	var semStart time.Time
+
+	if term == 1 {
+		// 秋季学期：9月1日所在周的周一
+		sep1 := time.Date(startYear, time.September, 1, 0, 0, 0, 0, loc)
+		weekday := int(sep1.Weekday())
+		if weekday == 0 {
+			weekday = 7
+		}
+		semStart = sep1.AddDate(0, 0, -(weekday - 1))
+	} else if term == 2 {
+		// 春季学期：次年3月1日所在周的周一
+		mar1 := time.Date(startYear+1, time.March, 1, 0, 0, 0, 0, loc)
+		weekday := int(mar1.Weekday())
+		if weekday == 0 {
+			weekday = 7
+		}
+		semStart = mar1.AddDate(0, 0, -(weekday - 1))
+	} else {
+		return 0
+	}
+
+	if nowCST.Before(semStart) {
+		return 1
+	}
+
+	diffDays := int(nowCST.Sub(semStart).Hours() / 24)
+	week := diffDays/7 + 1
+	if week >= 1 && week <= 25 {
+		return week
 	}
 	return 0
 }
@@ -162,21 +280,45 @@ func extractCurrentWeekFromHTML(body string) int {
 func extractCurrentSemesterNameFromHTML(body string) string {
 	text := html.UnescapeString(stripTags(body))
 
-	re := regexp.MustCompile(`(\d{4}-\d{4}学年[第]?[12一二][学期]*)`)
-	m := re.FindStringSubmatch(text)
-	if len(m) < 2 {
-		return ""
+	patterns := []string{
+		`(\d{4}\s*[-–—~～]\s*\d{4}\s*(?:学年|学年度|年度)?\s*(?:第)?\s*[123一二三两]\s*学期)`,
+		`(\d{4}\s*[-–—~～]\s*\d{4}\s*(?:学年|学年度|年度)\s*(?:第)?\s*[123一二三两])`,
+		`(\d{4}\s*[-–—~～]\s*\d{4}\s*[-_]\s*[123])`,
+		`(\d{4}\s*[-–—~～]\s*\d{4}\s*(?:学年|学年度|年度)?\s*(?:春季|秋季|夏季|秋|春|夏)\s*(?:学期)?)`,
+	}
+	for _, p := range patterns {
+		re := regexp.MustCompile(`(?i)` + p)
+		if m := re.FindStringSubmatch(text); len(m) > 1 {
+			if norm := normalizeSemesterText(m[1]); norm != "" {
+				return norm
+			}
+		}
 	}
 
-	return normalizeSemesterText(m[1])
+	return ""
 }
 
 func normalizeSemesterTerm(term string) string {
 	switch strings.TrimSpace(term) {
 	case "1", "一":
 		return "1"
-	case "2", "二":
+	case "2", "二", "两":
 		return "2"
+	case "3", "三":
+		return "3"
+	default:
+		return ""
+	}
+}
+
+func normalizeTermDigit(t string) string {
+	switch strings.TrimSpace(t) {
+	case "1", "一":
+		return "1"
+	case "2", "二", "两":
+		return "2"
+	case "3", "三":
+		return "3"
 	default:
 		return ""
 	}
@@ -190,9 +332,6 @@ func normalizeSemesterText(s string) string {
 		"\t", "",
 		"\r", "",
 		"\n", "",
-		"学年", "-",
-		"第", "",
-		"学期", "",
 		"\u2014", "-",
 		"\u2013", "-",
 		"\uff0d", "-",
@@ -200,16 +339,50 @@ func normalizeSemesterText(s string) string {
 		"~", "-",
 	).Replace(s)
 
-	s = strings.ReplaceAll(s, "一", "1")
-	s = strings.ReplaceAll(s, "二", "2")
+	yearRe := regexp.MustCompile(`(\d{4})-(\d{4})`)
+	mYear := yearRe.FindStringSubmatchIndex(s)
+	if len(mYear) < 4 {
+		return ""
+	}
+	y1 := s[mYear[2]:mYear[3]]
+	y2 := s[mYear[4]:mYear[5]]
 
-	re := regexp.MustCompile(`(\d{4})-(\d{4})-?([12])`)
-	m := re.FindStringSubmatch(s)
-	if len(m) < 4 {
+	rest := s[mYear[1]:]
+
+	term := ""
+	// 1. Direct dash-term, e.g. -1, -2, -3
+	if m := regexp.MustCompile(`^-([123])(?:\D|$)`).FindStringSubmatch(rest); len(m) > 1 {
+		term = m[1]
+	}
+
+	// 2. Chinese term patterns
+	if term == "" {
+		if m := regexp.MustCompile(`(?:第)?([123一二三两])\s*学期`).FindStringSubmatch(rest); len(m) > 1 {
+			term = normalizeTermDigit(m[1])
+		}
+	}
+
+	if term == "" {
+		if m := regexp.MustCompile(`(?:学年|学年度|年度)\s*(?:第)?\s*([123一二三两])`).FindStringSubmatch(rest); len(m) > 1 {
+			term = normalizeTermDigit(m[1])
+		}
+	}
+
+	if term == "" {
+		if strings.Contains(rest, "秋") {
+			term = "1"
+		} else if strings.Contains(rest, "春") {
+			term = "2"
+		} else if strings.Contains(rest, "夏") || strings.Contains(rest, "短") {
+			term = "3"
+		}
+	}
+
+	if term == "" {
 		return ""
 	}
 
-	return fmt.Sprintf("%s-%s-%s", m[1], m[2], m[3])
+	return fmt.Sprintf("%s-%s-%s", y1, y2, term)
 }
 
 func inferSemesterIDFromOptions(currentName string, options []map[string]any) string {
@@ -245,7 +418,7 @@ func parseNormalizedSemester(s string) (int, int, bool) {
 		return 0, 0, false
 	}
 
-	m := regexp.MustCompile(`^(\d{4})-\d{4}-([12])$`).FindStringSubmatch(normalized)
+	m := regexp.MustCompile(`^(\d{4})-\d{4}-([123])$`).FindStringSubmatch(normalized)
 	if len(m) < 3 {
 		return 0, 0, false
 	}
@@ -255,7 +428,7 @@ func parseNormalizedSemester(s string) (int, int, bool) {
 		return 0, 0, false
 	}
 	term, ok := parseInt(m[2])
-	if !ok || term < 1 || term > 2 {
+	if !ok || term < 1 || term > 3 {
 		return 0, 0, false
 	}
 
@@ -274,6 +447,8 @@ func formatSemesterDisplayName(normalized string) string {
 	termText := "第一"
 	if term == 2 {
 		termText = "第二"
+	} else if term == 3 {
+		termText = "第三"
 	}
 	return fmt.Sprintf("%d-%d学年第%s学期", startYear, startYear+1, termText)
 }

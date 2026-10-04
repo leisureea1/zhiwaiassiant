@@ -172,26 +172,52 @@ func (s *GradeSubscriptionService) checkUserGrades(ctx context.Context, sub *dat
 		return fmt.Errorf("failed to get semester: %w", err)
 	}
 
+	if success, ok := semesterData["success"].(bool); ok && !success {
+		errMsg := "unknown error"
+		if e, ok := semesterData["error"].(string); ok && e != "" {
+			errMsg = e
+		}
+		return fmt.Errorf("jwxt semester error: %s", errMsg)
+	}
+
 	currentSemesterID := ""
 	semesters := []map[string]any{}
 	if sd, ok := semesterData["semesters"].([]map[string]any); ok {
 		semesters = sd
+	} else if sd, ok := semesterData["semesters"].([]any); ok {
+		for _, item := range sd {
+			if m, ok := item.(map[string]any); ok {
+				semesters = append(semesters, m)
+			}
+		}
 	}
-	if cs, ok := semesterData["current_semester_id"].(string); ok {
-		currentSemesterID = cs
+
+	if cs, ok := semesterData["current_semester_id"].(string); ok && strings.TrimSpace(cs) != "" {
+		currentSemesterID = strings.TrimSpace(cs)
 	}
 	if currentSemesterID == "" && len(semesters) > 0 {
 		for _, sem := range semesters {
 			if cur, ok := sem["current"].(bool); ok && cur {
-				if id, ok := sem["id"].(string); ok {
+				id := strings.TrimSpace(fmt.Sprintf("%v", sem["id"]))
+				if id != "" && id != "<nil>" {
 					currentSemesterID = id
 					break
 				}
 			}
 		}
 	}
+	if currentSemesterID == "" && sub.SemesterID != nil && strings.TrimSpace(*sub.SemesterID) != "" {
+		currentSemesterID = strings.TrimSpace(*sub.SemesterID)
+	}
+	if currentSemesterID == "" && len(semesters) > 0 {
+		id := strings.TrimSpace(fmt.Sprintf("%v", semesters[0]["id"]))
+		if id != "" && id != "<nil>" {
+			currentSemesterID = id
+			log.Printf("[GradeSubscription] User %s: fallback to latest semester %s", sub.UserID, currentSemesterID)
+		}
+	}
 	if currentSemesterID == "" {
-		return fmt.Errorf("no current semester found")
+		return fmt.Errorf("no current semester found (semesters count: %d)", len(semesters))
 	}
 
 	// Get grades
@@ -254,7 +280,7 @@ func (s *GradeSubscriptionService) checkUserGrades(ctx context.Context, sub *dat
 	// Grades changed! Find semester name
 	semesterName := currentSemesterID
 	for _, sem := range semesters {
-		if id, ok := sem["id"].(string); ok && id == currentSemesterID {
+		if id := strings.TrimSpace(fmt.Sprintf("%v", sem["id"])); id == currentSemesterID {
 			if name, ok := sem["name"].(string); ok {
 				semesterName = name
 			}
@@ -264,7 +290,12 @@ func (s *GradeSubscriptionService) checkUserGrades(ctx context.Context, sub *dat
 
 	// Build grade table HTML for the email
 	gradeTableHTML := s.buildGradeTableHTML(gradesRaw)
-	changeCount := len(gradesRaw.([]map[string]any))
+	changeCount := 0
+	if gList, ok := gradesRaw.([]map[string]any); ok {
+		changeCount = len(gList)
+	} else if gList, ok := gradesRaw.([]any); ok {
+		changeCount = len(gList)
+	}
 
 	// Send notification email
 	realName := "同学"

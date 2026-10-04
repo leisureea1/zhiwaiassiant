@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
-	"strconv"
 	"strings"
+	"time"
 )
 
 func (s *JwxtDirectService) GetUser(sess *CachedJWXTSession) (map[string]any, error) {
@@ -15,9 +15,12 @@ func (s *JwxtDirectService) GetUser(sess *CachedJWXTSession) (map[string]any, er
 		return nil, err
 	}
 
-	studentID := s.getStudentID(client)
-	if strings.TrimSpace(studentID) == "" {
-		studentID = strings.TrimSpace(sess.StudentID)
+	studentID := strings.TrimSpace(sess.StudentID)
+	if studentID == "" {
+		studentID = s.getStudentID(client)
+		if studentID != "" {
+			sess.StudentID = studentID
+		}
 	}
 	detail := map[string]any{
 		"name":         nil,
@@ -219,12 +222,21 @@ func normalizeDetailLabel(label string) string {
 }
 
 func mergeWeekInfo(info map[string]any, html string) {
-	if m := regexp.MustCompile(`第\s*(\d+)\s*周`).FindStringSubmatch(html); len(m) > 1 {
-		if n, err := strconv.Atoi(m[1]); err == nil {
-			info["current_week"] = n
+	if w := extractCurrentWeekFromHTML(html); w > 0 {
+		info["current_week"] = w
+	}
+	semName := extractCurrentSemesterNameFromHTML(html)
+	if semName == "" {
+		if m := regexp.MustCompile(`(\d{4}[-~–]\d{4})学年.*?第\s*(\d+)\s*学期`).FindStringSubmatch(html); len(m) > 2 {
+			semName = fmt.Sprintf("%s学年第%s学期", m[1], m[2])
 		}
 	}
-	if m := regexp.MustCompile(`(\d{4}[-~–]\d{4})学年.*?第\s*(\d+)\s*学期`).FindStringSubmatch(html); len(m) > 2 {
-		info["semester_name"] = fmt.Sprintf("%s学年第%s学期", m[1], m[2])
+	if semName != "" {
+		info["semester_name"] = semName
+		if info["current_week"] == nil {
+			if w := inferCurrentWeekFromSemester(semName, time.Now()); w > 0 {
+				info["current_week"] = w
+			}
+		}
 	}
 }

@@ -28,10 +28,13 @@ func (s *JwxtDirectService) GetCourse(sess *CachedJWXTSession, semesterID, stude
 		return map[string]any{"success": false, "error": "无法获取当前学期ID", "courses": []any{}}, nil
 	}
 	if strings.TrimSpace(studentID) == "" {
-		studentID = s.getStudentID(client)
+		studentID = strings.TrimSpace(sess.StudentID)
 	}
 	if strings.TrimSpace(studentID) == "" {
-		studentID = strings.TrimSpace(sess.StudentID)
+		studentID = s.getStudentID(client)
+		if strings.TrimSpace(studentID) != "" {
+			sess.StudentID = studentID
+		}
 	}
 	if strings.TrimSpace(studentID) == "" {
 		return map[string]any{"success": false, "error": "无法获取学生ID", "courses": []any{}}, nil
